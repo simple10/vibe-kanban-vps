@@ -111,13 +111,17 @@ deploy_stack() {
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-    for f in docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore; do
-        if [[ -f "${script_dir}/${f}" ]]; then
-            cp "${script_dir}/${f}" "${DEPLOY_DIR}/${f}"
-        else
-            warn "File not found: ${script_dir}/${f}"
-        fi
-    done
+    if [[ "${script_dir}" != "${DEPLOY_DIR}" ]]; then
+        for f in docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore; do
+            if [[ -f "${script_dir}/${f}" ]]; then
+                cp "${script_dir}/${f}" "${DEPLOY_DIR}/${f}"
+            else
+                warn "File not found: ${script_dir}/${f}"
+            fi
+        done
+    else
+        info "Script is running from deploy directory, skipping file copy"
+    fi
 
     # Clone or update vibe-kanban source (needed for Docker build context)
     if [[ -d "${DEPLOY_DIR}/vibe-kanban/.git" ]]; then
