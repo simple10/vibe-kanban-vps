@@ -25,9 +25,10 @@ sudo bash setup.sh
 The setup script will:
 1. Install Docker CE
 2. Install Sysbox (secure Docker-in-Docker runtime)
-3. Copy files to `/home/vibe-kanban/`
-4. Prompt you to configure `.env`
-5. Build and start the stack
+3. Copy deployment files to `/home/vibe-kanban/`
+4. Clone vibe-kanban source from GitHub
+5. Prompt you to configure `.env`
+6. Build and start the stack
 
 ## Deployment Checklist
 
@@ -61,7 +62,9 @@ if [[ "${SSH_USER}" != "root" ]]; then
 fi
 ```
 
-### Step 1: Copy files to the VPS
+### Step 1: Copy deployment files to the VPS
+
+The vibe-kanban source is **not** copied from the local machine — `setup.sh` clones it directly from GitHub on the VPS.
 
 ```bash
 # Create the deploy directory on the VPS
@@ -72,22 +75,21 @@ $SCP_CMD docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerign
 
 # Copy .env (contains secrets — only if it exists locally)
 $SCP_CMD .env ${SSH_USER}@${VPS_IP}:/home/vibe-kanban/.env
-
-# Sync vibe-kanban source (needed for Docker build)
-rsync -az --delete \
-    -e "ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new" \
-    --exclude 'target' --exclude 'node_modules' --exclude '.git' \
-    vibe-kanban/ ${SSH_USER}@${VPS_IP}:/home/vibe-kanban/vibe-kanban/
 ```
 
 ### Step 2: Run setup on the VPS
 
-For first-time setup (installs Docker + Sysbox):
+For first-time setup (installs Docker + Sysbox, clones vibe-kanban source):
 ```bash
 $SSH_CMD "${SUDO} bash /home/vibe-kanban/setup.sh"
 ```
 
-For subsequent deploys (rebuild and restart):
+For subsequent deploys (pulls latest source, rebuilds, and restarts):
+```bash
+$SSH_CMD "${SUDO} bash /home/vibe-kanban/setup.sh"
+```
+
+Or to rebuild without pulling source updates:
 ```bash
 $SSH_CMD "cd /home/vibe-kanban && ${SUDO} docker compose up -d --build"
 ```
@@ -119,7 +121,7 @@ Look for `"Connection registered"` in the output. If absent, warn the user the t
 **Present a deploy report to the user** with this information:
 
 1. **Services status** — list each service and its state (running/healthy, starting, exited, etc.)
-2. **Files modified on VPS** — list the files that were copied/synced to `/home/vibe-kanban/` during this deploy
+2. **Files modified on VPS** — list the deployment files that were copied to `/home/vibe-kanban/` and whether vibe-kanban source was cloned/updated
 3. **How to access vibe-kanban:**
    - If `VK_DOMAIN` is set in `.env`: `https://<VK_DOMAIN>`
    - If `VK_DOMAIN` is not set: tell the user to find their tunnel's public hostname in the Cloudflare Zero Trust dashboard under Networks → Tunnels → their tunnel → Public Hostname
@@ -180,7 +182,7 @@ docker compose restart
 ### Update
 ```bash
 cd /home/vibe-kanban
-git pull                             # or rsync new source
+git -C vibe-kanban pull              # pull latest vibe-kanban source
 docker compose up -d --build
 ```
 

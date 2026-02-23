@@ -9,6 +9,7 @@ set -euo pipefail
 
 DEPLOY_DIR="/home/vibe-kanban"
 SYSBOX_VERSION="0.6.6"
+VK_REPO="https://github.com/BloopAI/vibe-kanban.git"
 
 # --- Colors ----------------------------------------------------------------
 RED='\033[0;31m'
@@ -118,16 +119,15 @@ deploy_stack() {
         fi
     done
 
-    # Copy vibe-kanban source (needed for Docker build context)
-    if [[ -d "${script_dir}/vibe-kanban" ]]; then
-        info "Syncing vibe-kanban source to ${DEPLOY_DIR}/vibe-kanban..."
-        rsync -a --delete \
-            --exclude 'target' \
-            --exclude 'node_modules' \
-            --exclude '.git' \
-            "${script_dir}/vibe-kanban/" "${DEPLOY_DIR}/vibe-kanban/"
+    # Clone or update vibe-kanban source (needed for Docker build context)
+    if [[ -d "${DEPLOY_DIR}/vibe-kanban/.git" ]]; then
+        info "Updating vibe-kanban source..."
+        git -C "${DEPLOY_DIR}/vibe-kanban" fetch --all
+        git -C "${DEPLOY_DIR}/vibe-kanban" reset --hard origin/main
     else
-        warn "vibe-kanban/ directory not found — Docker build will require it"
+        info "Cloning vibe-kanban source from ${VK_REPO}..."
+        rm -rf "${DEPLOY_DIR}/vibe-kanban"
+        git clone "${VK_REPO}" "${DEPLOY_DIR}/vibe-kanban"
     fi
 
     # Create .env from example if it doesn't exist
