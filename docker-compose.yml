@@ -6,8 +6,6 @@ services:
     runtime: sysbox-runc
     container_name: vibe-kanban
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3000:3000"
     volumes:
       - vk-data:/root/.local/share/vibe-kanban     # SQLite DB + config
       - vk-repos:/repos                             # Cloned repositories
@@ -26,19 +24,13 @@ services:
       start_period: 60s
       retries: 3
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: vibe-kanban-caddy
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: vibe-kanban-tunnel
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    env_file:
-      - .env
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    environment:
+      CF_TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN}
     depends_on:
       vibe-kanban:
         condition: service_healthy
@@ -48,5 +40,3 @@ volumes:
   vk-repos:
   vk-worktrees:
   vk-docker:
-  caddy-data:
-  caddy-config:

@@ -110,7 +110,7 @@ deploy_stack() {
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-    for f in docker-compose.yml Dockerfile.vps Caddyfile entrypoint.sh .env.example .dockerignore; do
+    for f in docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore; do
         if [[ -f "${script_dir}/${f}" ]]; then
             cp "${script_dir}/${f}" "${DEPLOY_DIR}/${f}"
         else
@@ -134,8 +134,8 @@ deploy_stack() {
     if [[ ! -f "${DEPLOY_DIR}/.env" ]]; then
         cp "${DEPLOY_DIR}/.env.example" "${DEPLOY_DIR}/.env"
         warn "Created ${DEPLOY_DIR}/.env from template — edit it before starting!"
-        warn "  Required: ANTHROPIC_API_KEY, VK_DOMAIN, VK_AUTH_HASH"
-        warn "  Generate password hash: docker run --rm caddy:2-alpine caddy hash-password"
+        warn "  Required: ANTHROPIC_API_KEY, CF_TUNNEL_TOKEN"
+        warn "  Get tunnel token: Cloudflare Zero Trust → Networks → Tunnels → Create"
         echo ""
         read -rp "Edit .env now? [Y/n] " edit_env
         if [[ "${edit_env,,}" != "n" ]]; then
@@ -158,16 +158,9 @@ start_stack() {
     echo ""
     info "Status:  docker compose -f ${DEPLOY_DIR}/docker-compose.yml ps"
     info "Logs:    docker compose -f ${DEPLOY_DIR}/docker-compose.yml logs -f"
+    info "Tunnel:  docker compose -f ${DEPLOY_DIR}/docker-compose.yml logs cloudflared"
     echo ""
-
-    # Show domain from .env if set
-    if grep -q 'VK_DOMAIN=' "${DEPLOY_DIR}/.env" 2>/dev/null; then
-        local domain
-        domain=$(grep 'VK_DOMAIN=' "${DEPLOY_DIR}/.env" | head -1 | cut -d= -f2)
-        if [[ -n "$domain" && "$domain" != "vibekanban.example.com" ]]; then
-            info "Access: https://${domain}"
-        fi
-    fi
+    info "Configure your tunnel's public hostname in the Cloudflare Zero Trust dashboard."
 }
 
 # --- Main -------------------------------------------------------------------
