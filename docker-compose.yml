@@ -11,6 +11,7 @@ services:
       - vk-repos:/repos                             # Cloned repositories
       - vk-worktrees:/var/tmp/vibe-kanban            # Worktrees
       - vk-docker:/var/lib/docker                    # Docker-in-Docker storage
+      - vk-claude:/root/.claude                      # Claude Code OAuth credentials
     env_file:
       - .env
     environment:
@@ -40,3 +41,4 @@ volumes:
   vk-repos:
   vk-worktrees:
   vk-docker:
+  vk-claude:

@@ -37,10 +37,16 @@ Before deploying, read `.env` and verify these required values are present and n
 1. **`VPS_IP`** — IP address of the target VPS
 2. **`SSH_KEY_PATH`** — Path to the SSH private key (must exist locally, passwordless)
 3. **`CF_TUNNEL_TOKEN`** — Cloudflare Tunnel token
-4. At least one agent API key (`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `OPENAI_API_KEY`)
+4. At least one of: an agent API key (`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `OPENAI_API_KEY`) **or** Claude Code OAuth login (see below)
 
 If `CF_TUNNEL_TOKEN` is missing, prompt with:
 > You need a Cloudflare Tunnel token. Create one at: Cloudflare Zero Trust dashboard → Networks → Tunnels → Create. Copy the token and set `CF_TUNNEL_TOKEN` in `.env`.
+
+If no `ANTHROPIC_API_KEY` is set, ask the user if they want to use Claude Code OAuth login instead. If yes, after deploying, run:
+```bash
+bash claude-login.sh
+```
+This SSHs into the VPS, docker execs into the vibe-kanban container, and runs the Claude Code login flow. The user will see a URL to open in their browser. Credentials are persisted in the `vk-claude` volume.
 
 ## Deploying to the VPS
 
@@ -145,7 +151,7 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 
 | Variable | Required | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Yes* | API key for Claude-based agents |
+| `ANTHROPIC_API_KEY` | No* | API key for Claude-based agents (or use OAuth via `claude-login.sh`) |
 | `GOOGLE_API_KEY` | No | API key for Gemini agents |
 | `OPENAI_API_KEY` | No | API key for OpenAI/Codex agents |
 | `CF_TUNNEL_TOKEN` | Yes | Cloudflare Tunnel token (see Deployment Checklist) |
@@ -159,7 +165,7 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 | `GIT_AUTHOR_EMAIL` | No | Git commit author email |
 | `GITHUB_TOKEN` | No | GitHub token for private repos |
 
-*At least one agent API key is required.
+*At least one agent API key is required, or use Claude Code OAuth login via `claude-login.sh`.
 
 ## Operations
 
@@ -214,6 +220,7 @@ docker compose exec vibe-kanban docker run --rm alpine echo "Docker works inside
 | `/repos/` | `vk-repos` | Cloned repositories |
 | `/var/tmp/vibe-kanban/` | `vk-worktrees` | Git worktrees for agents |
 | `/var/lib/docker/` | `vk-docker` | Docker-in-Docker storage |
+| `/root/.claude/` | `vk-claude` | Claude Code OAuth credentials |
 
 ## Troubleshooting
 
@@ -254,3 +261,4 @@ docker compose logs cloudflared
 | `docker-compose.yml` | Service definitions with sysbox-runc runtime |
 | `.env` / `.env.example` | Environment configuration |
 | `setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
+| `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |

@@ -17,7 +17,7 @@ Internet → Cloudflare Access → [VPS Docker Container]
 - A Cloudflare account with a domain
 - A Cloudflare Tunnel token ([create one](https://one.dash.cloudflare.com/) under Networks → Tunnels)
 - SSH key access to the VPS (passwordless)
-- At least one AI agent API key (Anthropic, Google, or OpenAI)
+- At least one AI agent API key (Anthropic, Google, or OpenAI), or a Claude Pro/Max/Teams subscription for OAuth login
 
 ## Setup
 
@@ -44,8 +44,10 @@ cp .env.example .env
 Edit `.env` and fill in the required values:
 
 ```bash
-# Required
-ANTHROPIC_API_KEY=sk-ant-...        # or GOOGLE_API_KEY / OPENAI_API_KEY
+# Claude agent: API key OR OAuth login (see below)
+# ANTHROPIC_API_KEY=sk-ant-...
+# GOOGLE_API_KEY=...
+# OPENAI_API_KEY=...
 CF_TUNNEL_TOKEN=eyJ...              # from Cloudflare Tunnels dashboard
 
 # VPS connection
@@ -110,11 +112,21 @@ ssh -i ~/.ssh/vps1_vibekanban_ed25519 root@YOUR_VPS_IP \
 
 Access vibe-kanban at the public hostname you configured in Cloudflare Tunnels.
 
+### 6. (Optional) Claude Code OAuth Login
+
+Instead of an `ANTHROPIC_API_KEY`, you can use your Claude Pro/Max/Teams/Enterprise subscription via OAuth. After deploying, run:
+
+```bash
+bash claude-login.sh
+```
+
+This SSHs into the VPS, opens a shell inside the vibe-kanban container, and runs the Claude Code login flow. You'll see a URL — open it in your browser to authorize. Credentials are persisted across container restarts in a Docker volume.
+
 ## Environment Variables
 
 | Variable | Required | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Yes* | API key for Claude-based agents |
+| `ANTHROPIC_API_KEY` | No* | API key for Claude agents (or use OAuth via `claude-login.sh`) |
 | `GOOGLE_API_KEY` | No | API key for Gemini agents |
 | `OPENAI_API_KEY` | No | API key for OpenAI/Codex agents |
 | `CF_TUNNEL_TOKEN` | Yes | Cloudflare Tunnel token |
@@ -128,7 +140,7 @@ Access vibe-kanban at the public hostname you configured in Cloudflare Tunnels.
 | `GIT_AUTHOR_EMAIL` | No | Git commit author email |
 | `GITHUB_TOKEN` | No | GitHub token for private repos |
 
-*At least one agent API key is required.
+*At least one agent API key is required, or use Claude Code OAuth login via `claude-login.sh`.
 
 ## Operations
 
@@ -176,6 +188,7 @@ docker compose restart vibe-kanban
 | `docker-compose.yml` | Service definitions with sysbox-runc runtime |
 | `.env.example` | Environment variable template |
 | `setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
+| `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |
 | `CLAUDE.md` | Instructions for Claude Code to deploy and operate the stack |
 
 ## Troubleshooting
