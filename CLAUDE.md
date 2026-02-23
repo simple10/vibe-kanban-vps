@@ -25,14 +25,104 @@ sudo bash setup.sh
 The setup script will:
 1. Install Docker CE
 2. Install Sysbox (secure Docker-in-Docker runtime)
-3. Copy files to `/opt/vibe-kanban/`
+3. Copy files to `/home/vibe-kanban/`
 4. Prompt you to configure `.env`
 5. Build and start the stack
 
 ## Deployment Checklist
 
-Before deploying, ensure `.env` contains a valid `CF_TUNNEL_TOKEN`. If it is missing or empty, prompt the user with:
+Before deploying, read `.env` and verify these required values are present and non-empty. If any are missing, stop and ask the user to provide them:
+
+1. **`VPS_IP`** — IP address of the target VPS
+2. **`SSH_KEY_PATH`** — Path to the SSH private key (must exist locally, passwordless)
+3. **`CF_TUNNEL_TOKEN`** — Cloudflare Tunnel token
+4. At least one agent API key (`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `OPENAI_API_KEY`)
+
+If `CF_TUNNEL_TOKEN` is missing, prompt with:
 > You need a Cloudflare Tunnel token. Create one at: Cloudflare Zero Trust dashboard → Networks → Tunnels → Create. Copy the token and set `CF_TUNNEL_TOKEN` in `.env`.
+
+## Deploying to the VPS
+
+Read SSH connection details from `.env`: `VPS_IP`, `SSH_KEY_PATH`, `SSH_USER` (default: `root`), `SSH_PORT` (default: `22`).
+
+Build the SSH/SCP command prefixes and sudo prefix used for all remote operations:
+
+```bash
+SSH_CMD="ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ${SSH_USER}@${VPS_IP}"
+SCP_CMD="scp -i ${SSH_KEY_PATH} -P ${SSH_PORT} -o StrictHostKeyChecking=accept-new"
+```
+
+If `SSH_USER` is **not** `root`, prefix commands that require elevated privileges with `sudo`:
+
+```bash
+SUDO=""
+if [[ "${SSH_USER}" != "root" ]]; then
+    SUDO="sudo"
+fi
+```
+
+### Step 1: Copy files to the VPS
+
+```bash
+# Create the deploy directory on the VPS
+$SSH_CMD "${SUDO} mkdir -p /home/vibe-kanban && ${SUDO} chown ${SSH_USER}: /home/vibe-kanban"
+
+# Copy deployment files
+$SCP_CMD docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore setup.sh ${SSH_USER}@${VPS_IP}:/home/vibe-kanban/
+
+# Copy .env (contains secrets — only if it exists locally)
+$SCP_CMD .env ${SSH_USER}@${VPS_IP}:/home/vibe-kanban/.env
+
+# Sync vibe-kanban source (needed for Docker build)
+rsync -az --delete \
+    -e "ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new" \
+    --exclude 'target' --exclude 'node_modules' --exclude '.git' \
+    vibe-kanban/ ${SSH_USER}@${VPS_IP}:/home/vibe-kanban/vibe-kanban/
+```
+
+### Step 2: Run setup on the VPS
+
+For first-time setup (installs Docker + Sysbox):
+```bash
+$SSH_CMD "${SUDO} bash /home/vibe-kanban/setup.sh"
+```
+
+For subsequent deploys (rebuild and restart):
+```bash
+$SSH_CMD "cd /home/vibe-kanban && ${SUDO} docker compose up -d --build"
+```
+
+### Step 3: Post-deploy verification and report
+
+After deploying, verify the stack is healthy and present a summary to the user.
+
+**Check the vibe-kanban container is running:**
+
+```bash
+$SSH_CMD "cd /home/vibe-kanban && ${SUDO} docker compose ps --format json"
+```
+
+Parse the output. The `vibe-kanban` service must show `running` status and health `healthy`. If it is not running or unhealthy, fetch logs and show the error to the user:
+
+```bash
+$SSH_CMD "cd /home/vibe-kanban && ${SUDO} docker compose logs --tail=40 vibe-kanban"
+```
+
+**Check the cloudflared tunnel:**
+
+```bash
+$SSH_CMD "cd /home/vibe-kanban && ${SUDO} docker compose logs --tail=20 cloudflared"
+```
+
+Look for `"Connection registered"` in the output. If absent, warn the user the tunnel may not be connected yet.
+
+**Present a deploy report to the user** with this information:
+
+1. **Services status** — list each service and its state (running/healthy, starting, exited, etc.)
+2. **Files modified on VPS** — list the files that were copied/synced to `/home/vibe-kanban/` during this deploy
+3. **How to access vibe-kanban:**
+   - If `VK_DOMAIN` is set in `.env`: `https://<VK_DOMAIN>`
+   - If `VK_DOMAIN` is not set: tell the user to find their tunnel's public hostname in the Cloudflare Zero Trust dashboard under Networks → Tunnels → their tunnel → Public Hostname
 
 ## Cloudflare Access Verification
 
@@ -58,6 +148,10 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 | `OPENAI_API_KEY` | No | API key for OpenAI/Codex agents |
 | `CF_TUNNEL_TOKEN` | Yes | Cloudflare Tunnel token (see Deployment Checklist) |
 | `VK_DOMAIN` | No | Domain served by the tunnel (for Access verification) |
+| `VPS_IP` | Yes | IP address of the target VPS |
+| `SSH_KEY_PATH` | Yes | Path to SSH private key for VPS (default: `~/.ssh/vps1_vibekanban_ed25519`) |
+| `SSH_USER` | No | SSH username (default: `root`) |
+| `SSH_PORT` | No | SSH port (default: `22`) |
 | `RUST_LOG` | No | Log level (default: `info`) |
 | `GIT_AUTHOR_NAME` | No | Git commit author name |
 | `GIT_AUTHOR_EMAIL` | No | Git commit author email |
@@ -67,9 +161,11 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 
 ## Operations
 
+All operations commands below are run on the VPS. If connected as a non-root user, prefix `docker` commands with `sudo`.
+
 ### Logs
 ```bash
-cd /opt/vibe-kanban
+cd /home/vibe-kanban
 docker compose logs -f              # all services
 docker compose logs -f vibe-kanban   # app only
 docker compose logs -f cloudflared   # tunnel only
@@ -77,13 +173,13 @@ docker compose logs -f cloudflared   # tunnel only
 
 ### Restart
 ```bash
-cd /opt/vibe-kanban
+cd /home/vibe-kanban
 docker compose restart
 ```
 
 ### Update
 ```bash
-cd /opt/vibe-kanban
+cd /home/vibe-kanban
 git pull                             # or rsync new source
 docker compose up -d --build
 ```

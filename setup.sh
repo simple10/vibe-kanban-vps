@@ -7,7 +7,7 @@ set -euo pipefail
 # Usage: sudo bash setup.sh
 # =============================================================================
 
-DEPLOY_DIR="/opt/vibe-kanban"
+DEPLOY_DIR="/home/vibe-kanban"
 SYSBOX_VERSION="0.6.6"
 
 # --- Colors ----------------------------------------------------------------
