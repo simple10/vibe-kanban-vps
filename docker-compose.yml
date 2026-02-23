@@ -15,7 +15,7 @@ services:
     env_file:
       - .env
     environment:
-      HOST: "0.0.0.0"
+      HOST: "0.0.0.0" # Expose vibe-kanban to the cloudflared tunnel - does not expose to internet
       PORT: "3000"
       HOME: /root
     healthcheck:
