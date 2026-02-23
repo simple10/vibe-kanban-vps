@@ -163,9 +163,10 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 | `RUST_LOG` | No | Log level (default: `info`) |
 | `GIT_AUTHOR_NAME` | No | Git commit author name |
 | `GIT_AUTHOR_EMAIL` | No | Git commit author email |
-| `GITHUB_TOKEN` | No | GitHub token for private repos |
 
 *At least one agent API key is required, or use Claude Code OAuth login via `claude-login.sh`.
+
+GitHub integration uses `gh` CLI (not a token). Run `bash gh-login.sh` after deploying to authenticate. This also auto-configures `git user.name` and `git user.email` inside the container from the GitHub profile.
 
 ## Operations
 
@@ -221,6 +222,7 @@ docker compose exec vibe-kanban docker run --rm alpine echo "Docker works inside
 | `/var/tmp/vibe-kanban/` | `vk-worktrees` | Git worktrees for agents |
 | `/var/lib/docker/` | `vk-docker` | Docker-in-Docker storage |
 | `/root/.claude/` | `vk-claude` | Claude Code OAuth credentials |
+| `/root/.config/gh/` | `vk-ghcli` | GitHub CLI OAuth credentials |
 
 ## Troubleshooting
 
@@ -262,3 +264,4 @@ docker compose logs cloudflared
 | `.env` / `.env.example` | Environment configuration |
 | `setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
 | `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |
+| `gh-login.sh` | Helper to run GitHub CLI OAuth login inside the container |

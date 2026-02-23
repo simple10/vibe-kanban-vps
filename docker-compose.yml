@@ -12,6 +12,7 @@ services:
       - vk-worktrees:/var/tmp/vibe-kanban            # Worktrees
       - vk-docker:/var/lib/docker                    # Docker-in-Docker storage
       - vk-claude:/root/.claude                      # Claude Code OAuth credentials
+      - vk-ghcli:/root/.config/gh                     # GitHub CLI OAuth credentials
     env_file:
       - .env
     environment:
@@ -42,3 +43,4 @@ volumes:
   vk-worktrees:
   vk-docker:
   vk-claude:
+  vk-ghcli:
