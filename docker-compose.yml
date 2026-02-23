@@ -1,0 +1,52 @@
+services:
+  vibe-kanban:
+    build:
+      context: .
+      dockerfile: Dockerfile.vps
+    runtime: sysbox-runc
+    container_name: vibe-kanban
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - vk-data:/root/.local/share/vibe-kanban     # SQLite DB + config
+      - vk-repos:/repos                             # Cloned repositories
+      - vk-worktrees:/var/tmp/vibe-kanban            # Worktrees
+      - vk-docker:/var/lib/docker                    # Docker-in-Docker storage
+    env_file:
+      - .env
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "3000"
+      HOME: /root
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 3s
+      start_period: 60s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: vibe-kanban-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    env_file:
+      - .env
+    depends_on:
+      vibe-kanban:
+        condition: service_healthy
+
+volumes:
+  vk-data:
+  vk-repos:
+  vk-worktrees:
+  vk-docker:
+  caddy-data:
+  caddy-config:

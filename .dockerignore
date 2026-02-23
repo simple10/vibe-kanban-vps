@@ -1,0 +1,12 @@
+.git
+.claude
+plans
+.env
+*.md
+!vibe-kanban/**/*.md
+vibe-kanban/target
+vibe-kanban/node_modules
+vibe-kanban/frontend/node_modules
+vibe-kanban/dev_assets
+vibe-kanban/.git
+vibe-kanban/.jj

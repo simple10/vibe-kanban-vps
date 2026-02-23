@@ -1,0 +1,103 @@
+# =============================================================================
+# Stage 1: Builder — compile frontend + Rust server binary
+# =============================================================================
+FROM node:24-bookworm AS builder
+
+# Install build dependencies (glibc-based for sysbox/ubuntu runtime)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    cmake \
+    clang \
+    llvm-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust nightly-2025-12-04 (matches rust-toolchain.toml)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --default-toolchain nightly-2025-12-04
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /app
+
+# Copy package files for dependency caching
+# Build context is the repo root, source lives under vibe-kanban/
+COPY vibe-kanban/package*.json vibe-kanban/pnpm-lock.yaml vibe-kanban/pnpm-workspace.yaml ./
+COPY vibe-kanban/frontend/package*.json ./frontend/
+COPY vibe-kanban/npx-cli/package*.json ./npx-cli/
+
+# Install pnpm and JS dependencies
+RUN npm install -g pnpm && pnpm install
+
+# Copy full source
+COPY vibe-kanban/ .
+
+# Generate TS types from Rust, build frontend, then build the server binary
+RUN npm run generate-types
+RUN cd frontend && pnpm run build
+RUN cargo build --release --bin server
+
+# =============================================================================
+# Stage 2: Runtime — Ubuntu with Docker CE + Node.js for agents
+# =============================================================================
+FROM ubuntu:24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Base runtime packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    wget \
+    git \
+    tini \
+    openssh-client \
+    gnupg \
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CE (agents may need Docker inside the sysbox container)
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+    https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+    > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    docker-ce \
+    docker-ce-cli \
+    containerd.io \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 24.x (needed for npx-based agent spawning)
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy server binary from builder
+COPY --from=builder /app/target/release/server /usr/local/bin/server
+
+# Create required directories
+RUN mkdir -p /repos \
+    /var/tmp/vibe-kanban/worktrees \
+    /root/.local/share/vibe-kanban
+
+# Copy entrypoint (from repo root context)
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Runtime environment
+ENV HOST=0.0.0.0
+ENV PORT=3000
+EXPOSE 3000
+
+WORKDIR /repos
+
+# Health check — hit the server root
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD wget --quiet --tries=1 --spider "http://localhost:${PORT:-3000}" || exit 1
+
+# tini as PID 1, then our entrypoint
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/usr/local/bin/entrypoint.sh"]

@@ -1,0 +1,6 @@
+{$VK_DOMAIN:localhost} {
+    basicauth * {
+        {$VK_AUTH_USER:admin} {$VK_AUTH_HASH}
+    }
+    reverse_proxy vibe-kanban:3000
+}
