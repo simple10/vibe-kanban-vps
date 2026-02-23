@@ -5,7 +5,11 @@
       "Bash(head:*)",
       "Bash(grep:*)",
       "Bash(find:*)",
-      "Bash(chmod +x:*)"
+      "Bash(chmod +x:*)",
+      "Bash($SSH_CMD:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(test:*)"
     ]
   }
 }
