@@ -63,21 +63,21 @@ SSH_USER=root                        # default: root
 SSH_PORT=22                          # default: 22
 
 # Optional
-VK_DOMAIN=vibekanban.example.com  # your tunnel's public hostname protected by Cloudflare Access
+# Your tunnel's public hostname protected by Cloudflare Access
 # If VK_DOMAIN is not set, you'll need to manually connect to the cloudflare tunnel
+VK_DOMAIN=vibekanban.example.com
 ```
 
-### 4. Deploy
+### 4. Deploy Using Claude Code
 
-#### Option A: Let Claude do it
-
-If you're using Claude Code, just ask it to deploy. It reads `.env`, copies deployment files to the VPS via scp, runs setup (which clones vibe-kanban source on the VPS), and verifies the stack.
+Just ask `claude` to deploy. It reads `.env`, copies deployment files to the VPS via scp, installs
+docker & sysbox (if needed) on the VPS, and starts the vibe-kanban docker-compose.yml.
 
 ```bash
 claude "deploy"
 ```
 
-**After Deploy:**
+#### After Deploy
 
 Use the helper scripts to authenticate Github and Claude Code.
 
@@ -97,9 +97,13 @@ Use the helper scripts to authenticate Github and Claude Code.
 NOTE: You will optionally need to sign-in to Vibe Kanban to enable the kanban features.
 Simply sign-in with your Github or Google account. No additional configuration is needed.
 
-#### Option B: Manual deploy
+---
 
-Copy deployment files to the VPS and run the setup script. The vibe-kanban source is cloned directly on the VPS — you don't need it locally.
+### Manual deploy (optional)
+
+If not using `claude` to deploy for you, follow these instructions.
+
+Copy deployment files to the VPS and run the setup script.
 
 ```bash
 # Create deploy directory and copy deployment files
@@ -122,7 +126,12 @@ ssh -i ~/.ssh/vps1_vibekanban_ed25519 root@YOUR_VPS_IP \
     "bash /home/vibe-kanban/setup.sh"
 ```
 
+---
+
 ### 5. Verify
+
+Claude will verify everything for you after first deploy.
+The following steps are only if you want to manually verify.
 
 ```bash
 ssh -i ~/.ssh/vps1_vibekanban_ed25519 root@YOUR_VPS_IP \
@@ -140,7 +149,7 @@ Access vibe-kanban at the public hostname you configured in Cloudflare Tunnels.
 
 ### 6. (Optional) Claude Code OAuth Login
 
-Instead of an `ANTHROPIC_API_KEY`, you can use your Claude Pro/Max/Teams/Enterprise subscription via OAuth. After deploying, run:
+You can use your Claude Pro/Max/Teams/Enterprise subscription via OAuth. After deploying, run:
 
 ```bash
 bash claude-login.sh
@@ -156,7 +165,7 @@ vibe-kanban uses the GitHub CLI (`gh`) for PR creation — not a `GITHUB_TOKEN`.
 bash gh-login.sh
 ```
 
-This SSHs into the container and runs `gh auth login`. You'll get a URL and a one-time code to authorize in your browser. After login, it also auto-configures `git user.name` and `git user.email` inside the container from your GitHub profile. Credentials are persisted in a Docker volume.
+This SSHs into the container and runs `gh auth login`. You'll get a URL and a one-time code to authorize in your browser. After login, it also auto-configures `git user.name` and `git user.email` inside the container from your GitHub profile and adds a generated ssh key to your Github account. Credentials are persisted in a Docker volume.
 
 ## Environment Variables
 
