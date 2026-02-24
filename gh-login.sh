@@ -4,7 +4,7 @@ set -euo pipefail
 # =============================================================================
 # GitHub CLI Login Helper
 # SSHs into the VPS, docker execs into the vibe-kanban container, runs
-# gh auth login, then configures git author identity from the GitHub profile.
+# gh auth login (with SSH key generation), then configures git identity.
 #
 # Usage: bash gh-login.sh
 # =============================================================================
@@ -34,18 +34,42 @@ if [[ "${SSH_USER}" != "root" ]]; then
 fi
 
 SSH_CMD="ssh -t -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ${SSH_USER}@${VPS_IP}"
-DOCKER_EXEC="${SUDO} docker exec -i vibe-kanban"
-DOCKER_EXEC_IT="${SUDO} docker exec -it vibe-kanban"
+DOCKER_EXEC="${SUDO} docker exec -i -u vkuser -e HOME=/home/vkuser vibe-kanban"
+DOCKER_EXEC_IT="${SUDO} docker exec -it -u vkuser -e HOME=/home/vkuser vibe-kanban"
+
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
 
 # --- Run gh auth login inside the container ---------------------------------
-echo "Connecting to ${VPS_IP} and running GitHub CLI login inside the vibe-kanban container..."
-echo "A URL will be displayed — open it in your browser to complete the login."
+echo -e "${YELLOW}Connecting to ${VPS_IP} and running GitHub CLI login inside the vibe-kanban container...${NC}"
+echo ""
+echo "This script creates a new ssh-key (if needed) securely in the vibe-kanban container."
+echo "It adds the key to your github account. The key is persisted in the vk-ssh docker volume."
+echo ""
+echo -e "${CYAN}IMPORTANT: When prompted for a passphrase, leave it EMPTY (just press Enter).${NC}"
+echo -e "${CYAN}           Agents cannot enter passphrases interactively.${NC}"
+echo -e "${CYAN}           Ignore any errors about browser unable to open on the VPS.${NC}"
 echo ""
 
-$SSH_CMD "${DOCKER_EXEC_IT} gh auth login --web --git-protocol https"
+$SSH_CMD "${DOCKER_EXEC_IT} gh auth login --web --git-protocol ssh"
+
+# --- Configure SSH for github.com -------------------------------------------
+echo ""
+echo "Configuring SSH for GitHub..."
+
+# Find the key gh generated (it uses id_ed25519 by default)
+$SSH_CMD "${DOCKER_EXEC} bash -c 'cat > /home/vkuser/.ssh/config << EOF
+Host github.com
+    IdentityFile /home/vkuser/.ssh/id_ed25519
+    StrictHostKeyChecking accept-new
+EOF
+chmod 600 /home/vkuser/.ssh/config'"
+
+# Configure git to use SSH for GitHub URLs
+$SSH_CMD "${DOCKER_EXEC} git config --global url.git@github.com:.insteadOf https://github.com/"
 
 # --- Configure git identity from GitHub profile -----------------------------
-echo ""
 echo "Configuring git author identity from GitHub profile..."
 
 # Get name from gh api user
@@ -78,4 +102,4 @@ else
 fi
 
 echo ""
-echo "Done. GitHub CLI is authenticated and git identity is configured."
+echo "Done. GitHub CLI authenticated, SSH key configured, git identity set."
