@@ -50,29 +50,11 @@ This SSHs into the VPS, docker execs into the vibe-kanban container, and runs th
 
 ## Deploying to the VPS
 
-Read SSH connection details from `.env`: `VPS_IP`, `SSH_KEY_PATH`, `SSH_USER` (default: `root`), `SSH_PORT` (default: `22`).
-
-Build the SSH/SCP command prefixes and sudo prefix used for all remote operations. Use arrays (not strings) so the commands work in both bash and zsh:
+All VPS operations use the `vps.sh` helper script, which reads SSH connection details from `.env` and auto-adds `sudo` for non-root users:
 
 ```bash
-SSH_CMD=(ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}")
-SCP_CMD=(scp -i "${SSH_KEY_PATH}" -P "${SSH_PORT}" -o StrictHostKeyChecking=accept-new)
-```
-
-If `SSH_USER` is **not** `root`, prefix commands that require elevated privileges with `sudo`:
-
-```bash
-SUDO=""
-if [[ "${SSH_USER}" != "root" ]]; then
-    SUDO="sudo"
-fi
-```
-
-Execute commands using array expansion:
-
-```bash
-"${SSH_CMD[@]}" "command to run"
-"${SCP_CMD[@]}" local-file "${SSH_USER}@${VPS_IP}:/remote/path/"
+bash vps.sh ssh "command to run on VPS"
+bash vps.sh scp file1 [file2...] /remote/path/
 ```
 
 ### Step 1: Copy deployment files to the VPS
@@ -81,30 +63,30 @@ The vibe-kanban source is **not** copied from the local machine — `setup.sh` c
 
 ```bash
 # Create the deploy directory on the VPS
-"${SSH_CMD[@]}" "${SUDO} mkdir -p /home/vibe-kanban && ${SUDO} chown ${SSH_USER}: /home/vibe-kanban"
+bash vps.sh ssh "mkdir -p /home/vibe-kanban && chown \$(whoami): /home/vibe-kanban"
 
 # Copy deployment files
-"${SCP_CMD[@]}" docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore setup.sh "${SSH_USER}@${VPS_IP}:/home/vibe-kanban/"
+bash vps.sh scp docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore setup.sh /home/vibe-kanban/
 
 # Copy .env (contains secrets — only if it exists locally)
-"${SCP_CMD[@]}" .env "${SSH_USER}@${VPS_IP}:/home/vibe-kanban/.env"
+bash vps.sh scp .env /home/vibe-kanban/.env
 ```
 
 ### Step 2: Run setup on the VPS
 
 For first-time setup (installs Docker + Sysbox, clones vibe-kanban source):
 ```bash
-"${SSH_CMD[@]}" "${SUDO} bash /home/vibe-kanban/setup.sh"
+bash vps.sh ssh "bash /home/vibe-kanban/setup.sh"
 ```
 
 For subsequent deploys (pulls latest source, rebuilds, and restarts):
 ```bash
-"${SSH_CMD[@]}" "${SUDO} bash /home/vibe-kanban/setup.sh"
+bash vps.sh ssh "bash /home/vibe-kanban/setup.sh"
 ```
 
 Or to rebuild without pulling source updates:
 ```bash
-"${SSH_CMD[@]}" "cd /home/vibe-kanban && ${SUDO} docker compose up -d --build"
+bash vps.sh ssh "cd /home/vibe-kanban && docker compose up -d --build"
 ```
 
 ### Step 3: Post-deploy verification and report
@@ -114,19 +96,19 @@ After deploying, verify the stack is healthy and present a summary to the user.
 **Check the vibe-kanban container is running:**
 
 ```bash
-"${SSH_CMD[@]}" "cd /home/vibe-kanban && ${SUDO} docker compose ps --format json"
+bash vps.sh ssh "cd /home/vibe-kanban && docker compose ps --format json"
 ```
 
 Parse the output. The `vibe-kanban` service must show `running` status and health `healthy`. If it is not running or unhealthy, fetch logs and show the error to the user:
 
 ```bash
-"${SSH_CMD[@]}" "cd /home/vibe-kanban && ${SUDO} docker compose logs --tail=40 vibe-kanban"
+bash vps.sh ssh "cd /home/vibe-kanban && docker compose logs --tail=40 vibe-kanban"
 ```
 
 **Check the cloudflared tunnel:**
 
 ```bash
-"${SSH_CMD[@]}" "cd /home/vibe-kanban && ${SUDO} docker compose logs --tail=20 cloudflared"
+bash vps.sh ssh "cd /home/vibe-kanban && docker compose logs --tail=20 cloudflared"
 ```
 
 Look for `"Connection registered"` in the output. If absent, warn the user the tunnel may not be connected yet.
@@ -270,5 +252,6 @@ docker compose logs cloudflared
 | `docker-compose.yml` | Service definitions with sysbox-runc runtime |
 | `.env` / `.env.example` | Environment configuration |
 | `setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
+| `vps.sh` | SSH/SCP wrapper — reads `.env`, auto-adds sudo for non-root |
 | `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |
 | `gh-login.sh` | Helper to run GitHub CLI OAuth login inside the container |
