@@ -33,7 +33,7 @@ if [[ "${SSH_USER}" != "root" ]]; then
     SUDO="sudo"
 fi
 
-SSH_CMD="TERM=xterm-256color ssh -t -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ${SSH_USER}@${VPS_IP}"
+SSH_CMD="ssh -t -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ${SSH_USER}@${VPS_IP}"
 
 # --- Run Claude Code login inside the container -----------------------------
 echo "Connecting to ${VPS_IP} and running Claude Code login inside the vibe-kanban container..."

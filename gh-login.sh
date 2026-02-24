@@ -33,7 +33,7 @@ if [[ "${SSH_USER}" != "root" ]]; then
     SUDO="sudo"
 fi
 
-SSH_CMD="TERM=xterm-256color ssh -t -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ${SSH_USER}@${VPS_IP}"
+SSH_CMD="ssh -t -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ${SSH_USER}@${VPS_IP}"
 DOCKER_EXEC="${SUDO} docker exec -i vibe-kanban"
 DOCKER_EXEC_IT="${SUDO} docker exec -it vibe-kanban"
 
