@@ -9,7 +9,8 @@
       "Bash($SSH_CMD:*)",
       "Bash(ssh:*)",
       "Bash(scp:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(bash:*)"
     ]
   }
 }
