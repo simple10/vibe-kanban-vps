@@ -15,10 +15,11 @@ First deploy takes about 15-20 minutes to build the vibe-kanban docker container
 
 ## Prerequisites
 
-- An Ubuntu VPS (tested on Ubuntu 24.04/25.04)
+- Ubuntu VPS (tested on Ubuntu 24.04/25.04)
 - A Cloudflare account with a domain
 - A Cloudflare Tunnel token ([create one](https://one.dash.cloudflare.com/) under Networks → Tunnels)
 - SSH key access to the VPS (passwordless)
+- Github account (if using git with Vibe Kanban)
 
 ## Setup
 
@@ -71,12 +72,12 @@ claude "deploy"
 
 **After Deploy:**
 
-Skip the Vibe Kanban login screen - see "More options" link when prompted to login.
-
-Then use the helper scripts to authenticate Github and Claude Code.
+Use the helper scripts to authenticate Github and Claude Code.
 
 ```bash
-# Log vibe-kanban into your github account (optional)
+# Log vibe-kanban into your github account
+# This step is required for vibe-kanban to git commit and push/pull code
+# Auto generates a ssh key (if needed) for vibe-kanban and adds it to your github account
 ./gh-login.sh
 
 # Log claude code into anthropic subscription (optional)
