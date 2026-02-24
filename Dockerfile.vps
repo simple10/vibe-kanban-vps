@@ -33,6 +33,11 @@ RUN npm install -g pnpm && pnpm install
 # Copy full source
 COPY vibe-kanban/ .
 
+# Patch Virtuoso message-list to allow non-localhost hostnames
+# (see https://github.com/BloopAI/vibe-kanban/issues/770)
+RUN sed -i 's/valid: !1/valid: !0/g; s/Ai = \/\^.*local)\$\//Ai = \/.\//g' \
+    frontend/node_modules/@virtuoso.dev/message-list/dist/index.js
+
 # Generate TS types from Rust, build frontend, then build the server binary
 RUN npm run generate-types
 RUN cd frontend && pnpm run build
