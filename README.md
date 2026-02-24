@@ -1,6 +1,6 @@
-# vibe-kanban VPS Deployment
+# Vibe Kanban VPS Deployment
 
-Deploy [vibe-kanban](https://github.com/BloopAI/vibe-kanban) to a VPS with zero exposed ports. The vibe-kanban source is cloned directly on the VPS during setup — no local copy needed. Traffic is routed through a Cloudflare Tunnel, and authentication is handled by Cloudflare Access.
+This project auto deploys [vibe-kanban](https://github.com/BloopAI/vibe-kanban) to a VPS with zero exposed ports. The vibe-kanban source is cloned directly on the VPS during setup — no local copy needed. Traffic is routed through a Cloudflare Tunnel, and authentication is handled by Cloudflare Access.
 
 ```text
 Internet → Cloudflare Access → [VPS Docker Container]
@@ -11,21 +11,23 @@ Internet → Cloudflare Access → [VPS Docker Container]
          └── agents via npx (Claude Code, etc.)
 ```
 
+First deploy takes about 15-20 minutes to build the vibe-kanban docker container.
+
 ## Prerequisites
 
 - An Ubuntu VPS (tested on Ubuntu 24.04/25.04)
 - A Cloudflare account with a domain
 - A Cloudflare Tunnel token ([create one](https://one.dash.cloudflare.com/) under Networks → Tunnels)
 - SSH key access to the VPS (passwordless)
-- At least one AI agent API key (Anthropic, Google, or OpenAI), or a Claude Pro/Max/Teams subscription for OAuth login
 
 ## Setup
 
 ### 1. Clone this repo
 
 ```bash
-git clone <this-repo-url>
+git clone https://github.com/simple10/vibe-kanban-vps.git
 cd vibekanban-vps
+cp .env.example .env
 ```
 
 ### 2. Create a Cloudflare Tunnel
@@ -36,10 +38,6 @@ cd vibekanban-vps
 4. (Recommended) Add a Cloudflare Access policy to protect the hostname
 
 ### 3. Configure `.env`
-
-```bash
-cp .env.example .env
-```
 
 Edit `.env` and fill in the required values:
 
@@ -68,7 +66,24 @@ VK_DOMAIN=vibekanban.example.com  # your tunnel's public hostname protected by C
 If you're using Claude Code, just ask it to deploy. It reads `.env`, copies deployment files to the VPS via scp, runs setup (which clones vibe-kanban source on the VPS), and verifies the stack.
 
 ```bash
-claude "deploy vibekanban"
+claude "deploy"
+```
+
+**After Deploy:**
+
+Skip the Vibe Kanban login screen - see "More options" link when prompted to login.
+
+Then use the helper scripts to authenticate Github and Claude Code.
+
+```bash
+# Log vibe-kanban into your github account (optional)
+./gh-login.sh
+
+# Log claude code into anthropic subscription (optional)
+./claude-login.sh
+# Claude may loop on the login flow
+# Just manually exit claude after completing the login flow one time
+# Credentials are persisted in the vk-claude docker volume
 ```
 
 #### Option B: Manual deploy
