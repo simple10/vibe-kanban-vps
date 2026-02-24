@@ -32,7 +32,7 @@ case "${1:-}" in
         if [[ "${SSH_USER}" == "root" ]]; then
             ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}" "$*"
         else
-            ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}" "sudo bash -c '$*'"
+            ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}" "sudo -s -- eval '$*'"
         fi
         ;;
     scp)

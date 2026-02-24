@@ -178,8 +178,7 @@ docker compose restart
 ### Update
 ```bash
 cd /home/vibe-kanban
-git -C vibe-kanban pull              # pull latest vibe-kanban source
-docker compose up -d --build
+docker compose up -d --build         # rebuilds image with latest npm package
 ```
 
 ### Backup SQLite DB
@@ -206,12 +205,13 @@ docker compose exec vibe-kanban docker run --rm alpine echo "Docker works inside
 
 | Path | Volume | Purpose |
 |---|---|---|
-| `/root/.local/share/vibe-kanban/` | `vk-data` | SQLite DB, config, profiles, credentials |
+| `/home/vkuser/.local/share/vibe-kanban/` | `vk-data` | SQLite DB, config, profiles, credentials |
 | `/repos/` | `vk-repos` | Cloned repositories |
 | `/var/tmp/vibe-kanban/` | `vk-worktrees` | Git worktrees for agents |
 | `/var/lib/docker/` | `vk-docker` | Docker-in-Docker storage |
-| `/root/.claude/` | `vk-claude` | Claude Code OAuth credentials |
-| `/root/.config/gh/` | `vk-ghcli` | GitHub CLI OAuth credentials |
+| `/home/vkuser/.claude/` | `vk-claude` | Claude Code OAuth credentials |
+| `/home/vkuser/.config/gh/` | `vk-ghcli` | GitHub CLI OAuth credentials |
+| `/home/vkuser/.ssh/` | `vk-ssh` | SSH keys for git push to GitHub |
 
 ## Troubleshooting
 

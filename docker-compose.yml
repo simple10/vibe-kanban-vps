@@ -7,18 +7,19 @@ services:
     container_name: vibe-kanban
     restart: unless-stopped
     volumes:
-      - vk-data:/root/.local/share/vibe-kanban     # SQLite DB + config
-      - vk-repos:/repos                             # Cloned repositories
-      - vk-worktrees:/var/tmp/vibe-kanban            # Worktrees
-      - vk-docker:/var/lib/docker                    # Docker-in-Docker storage
-      - vk-claude:/root/.claude                      # Claude Code OAuth credentials
-      - vk-ghcli:/root/.config/gh                     # GitHub CLI OAuth credentials
+      - vk-data:/home/vkuser/.local/share/vibe-kanban  # SQLite DB + config
+      - vk-repos:/repos                                 # Cloned repositories
+      - vk-worktrees:/var/tmp/vibe-kanban                # Worktrees
+      - vk-docker:/var/lib/docker                        # Docker-in-Docker storage
+      - vk-claude:/home/vkuser/.claude                   # Claude Code OAuth credentials
+      - vk-ghcli:/home/vkuser/.config/gh                 # GitHub CLI OAuth credentials
+      - vk-ssh:/home/vkuser/.ssh                         # SSH keys for git push
     env_file:
       - .env
     environment:
       HOST: "0.0.0.0" # Expose vibe-kanban to the cloudflared tunnel - does not expose to internet
       PORT: "3000"
-      HOME: /root
+      HOME: /home/vkuser
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
@@ -44,3 +45,4 @@ volumes:
   vk-docker:
   vk-claude:
   vk-ghcli:
+  vk-ssh:

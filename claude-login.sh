@@ -40,4 +40,4 @@ echo "Connecting to ${VPS_IP} and running Claude Code login inside the vibe-kanb
 echo "A URL will be displayed — open it in your browser to complete the login."
 echo ""
 
-$SSH_CMD "${SUDO} docker exec -it vibe-kanban npx -y @anthropic-ai/claude-code@latest /login"
+$SSH_CMD "${SUDO} docker exec -it -u vkuser -e HOME=/home/vkuser vibe-kanban npx -y @anthropic-ai/claude-code@latest /login"

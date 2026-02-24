@@ -1,52 +1,8 @@
 # =============================================================================
-# Stage 1: Builder — compile frontend + Rust server binary
+# vibe-kanban VPS — runtime image with npx-based install
+# No build stage needed: vibe-kanban is installed from npm at image build time.
 # =============================================================================
-FROM node:24-bookworm AS builder
-
-# Install build dependencies (glibc-based for sysbox/ubuntu runtime)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    pkg-config \
-    libssl-dev \
-    cmake \
-    clang \
-    llvm-dev \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Rust nightly-2025-12-04 (matches rust-toolchain.toml)
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- -y --default-toolchain nightly-2025-12-04
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-WORKDIR /app
-
-# Copy package files for dependency caching
-# Build context is the repo root, source lives under vibe-kanban/
-COPY vibe-kanban/package*.json vibe-kanban/pnpm-lock.yaml vibe-kanban/pnpm-workspace.yaml ./
-COPY vibe-kanban/frontend/package*.json ./frontend/
-COPY vibe-kanban/npx-cli/package*.json ./npx-cli/
-
-# Install pnpm and JS dependencies
-RUN npm install -g pnpm && pnpm install
-
-# Copy full source
-COPY vibe-kanban/ .
-
-# Patch Virtuoso message-list to allow non-localhost hostnames
-# (see https://github.com/BloopAI/vibe-kanban/issues/770)
-RUN sed -i 's/valid: !1/valid: !0/g; s/Ai = \/\^.*local)\$\//Ai = \/.\//g' \
-    frontend/node_modules/@virtuoso.dev/message-list/dist/index.js
-
-# Generate TS types from Rust, build frontend, then build the server binary
-RUN npm run generate-types
-RUN cd frontend && pnpm run build
-RUN cargo build --release --bin server
-
-# =============================================================================
-# Stage 2: Runtime — Ubuntu with Docker CE + Node.js for agents
-# =============================================================================
-FROM ubuntu:24.04 AS runtime
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -60,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     gnupg \
     lsb-release \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Docker CE (agents may need Docker inside the sysbox container)
@@ -75,7 +32,7 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
     containerd.io \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 24.x (needed for npx-based agent spawning)
+# Install Node.js 24.x (needed for vibe-kanban + npx-based agent spawning)
 RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
@@ -89,15 +46,22 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     apt-get update && apt-get install -y --no-install-recommends gh && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy server binary from builder
-COPY --from=builder /app/target/release/server /usr/local/bin/server
+# Install vibe-kanban from npm (includes pre-built frontend with Virtuoso license)
+RUN npm install -g vibe-kanban
 
-# Create required directories
+# Create non-root user for vibe-kanban (Claude Code refuses --dangerously-skip-permissions as root)
+RUN groupadd -r vkuser && \
+    useradd -r -g vkuser -G docker -m -s /bin/bash vkuser
+
+# Create required directories owned by vkuser
 RUN mkdir -p /repos \
     /var/tmp/vibe-kanban/worktrees \
-    /root/.local/share/vibe-kanban
+    /home/vkuser/.local/share/vibe-kanban \
+    /home/vkuser/.claude \
+    /home/vkuser/.config/gh && \
+    chown -R vkuser:vkuser /repos /var/tmp/vibe-kanban /home/vkuser
 
-# Copy entrypoint (from repo root context)
+# Copy entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
