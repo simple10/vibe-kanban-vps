@@ -87,6 +87,9 @@ Use the helper scripts to authenticate Github and Claude Code.
 # Credentials are persisted in the vk-claude docker volume
 ```
 
+NOTE: You will optionally need to sign-in to Vibe Kanban to enable the kanban features.
+Simply sign-in with your Github or Google account. No additional configuration is needed.
+
 #### Option B: Manual deploy
 
 Copy deployment files to the VPS and run the setup script. The vibe-kanban source is cloned directly on the VPS — you don't need it locally.
