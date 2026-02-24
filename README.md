@@ -1,6 +1,12 @@
 # Vibe Kanban VPS Deployment
 
-This project auto deploys [vibe-kanban](https://github.com/BloopAI/vibe-kanban) to a VPS with zero exposed ports. The vibe-kanban source is cloned directly on the VPS during setup — no local copy needed. Traffic is routed through a Cloudflare Tunnel, and authentication is handled by Cloudflare Access.
+This project auto deploys [vibe-kanban](https://github.com/BloopAI/vibe-kanban) to a VPS with zero exposed ports. Traffic is routed through a Cloudflare Tunnel, and authentication is handled by Cloudflare Access.
+
+The [Dockerfile.vps](./Dockerfile.vps) used in this project installs `vibe-kanban` using npm.
+It's equivalent to running `npx vibe-kanban` on your local machine.
+
+You can optionally modify this project (via claude code) to use vibe-kanban's self hosted deployment
+(Supabase, ElasticSQL, etc.). The current basic setup works fine for personal use.
 
 ```text
 Internet → Cloudflare Access → [VPS Docker Container]
@@ -11,7 +17,8 @@ Internet → Cloudflare Access → [VPS Docker Container]
          └── agents via npx (Claude Code, etc.)
 ```
 
-First deploy takes about 15-20 minutes to build the vibe-kanban docker container.
+First deploy takes about 3-5 minutes to install docker & sysbox on the VPS (if needed).
+The container build is fast because `npm -g install vibe-kanban` only downloads a ~50MB rust binary.
 
 ## Prerequisites
 
