@@ -383,6 +383,22 @@ All persistent data is stored in bind mounts under `$INSTALL_DIR/data/` on the V
 | `/home/vkuser/.ssh/` | `data/vk-ssh/` | SSH keys for git push to GitHub |
 | `/etc/ssh/sshd_host_keys/` | `data/vk-sshd/` | sshd host keys (IDE SSH) |
 
+### VPS host file backups
+
+`$INSTALL_DIR/.uninstall/` stores original copies of VPS host files before they were modified by setup scripts. This enables rollback/uninstall. Backups are only created once — re-running scripts does not overwrite existing backups.
+
+| Backup path | Original file | Modified by |
+|---|---|---|
+| `.uninstall/sshd/sshd_config` | `/etc/ssh/sshd_config` | `ide-ssh-setup.sh` |
+| `.uninstall/sshd/sshd_config.d/*.conf` | `/etc/ssh/sshd_config.d/*.conf` | `ide-ssh-setup.sh` |
+
+To restore original sshd config:
+
+```bash
+sudo cp ${INSTALL_DIR}/.uninstall/sshd/sshd_config.d/*.conf /etc/ssh/sshd_config.d/
+sudo systemctl restart sshd
+```
+
 ## Troubleshooting
 
 ### Container won't start

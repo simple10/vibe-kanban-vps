@@ -71,6 +71,9 @@ CHANGES_LOCAL=()
 CHANGES_VPS_HOST=()
 CHANGES_CONTAINER=()
 
+# Backup directory on the VPS for uninstall/rollback
+UNINSTALL_DIR="${INSTALL_DIR}/.uninstall"
+
 # --- Derive public key -------------------------------------------------------
 if [[ -z "$PUB_KEY_PATH" ]]; then
     # Expand ~ in SSH_KEY_PATH
@@ -147,6 +150,39 @@ else
     echo ""
 
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+        # Back up sshd config files before modifying
+        echo -e "${YELLOW}Backing up VPS sshd config...${NC}"
+        BACKUP_RESULT=$($SSH_CMD "${SUDO} bash -c '
+            BACKUP_DIR=${UNINSTALL_DIR}/sshd
+            mkdir -p \"\$BACKUP_DIR\"
+            BACKED_UP=0
+            # Back up main sshd_config
+            if [[ -f /etc/ssh/sshd_config ]] && [[ ! -f \"\$BACKUP_DIR/sshd_config\" ]]; then
+                cp /etc/ssh/sshd_config \"\$BACKUP_DIR/sshd_config\"
+                echo \"Backed up /etc/ssh/sshd_config\"
+                BACKED_UP=1
+            fi
+            # Back up all sshd_config.d/ files
+            if [[ -d /etc/ssh/sshd_config.d/ ]]; then
+                mkdir -p \"\$BACKUP_DIR/sshd_config.d\"
+                for f in /etc/ssh/sshd_config.d/*.conf; do
+                    [[ -f \"\$f\" ]] || continue
+                    fname=\$(basename \"\$f\")
+                    if [[ ! -f \"\$BACKUP_DIR/sshd_config.d/\$fname\" ]]; then
+                        cp \"\$f\" \"\$BACKUP_DIR/sshd_config.d/\$fname\"
+                        echo \"Backed up \$f\"
+                        BACKED_UP=1
+                    fi
+                done
+            fi
+            if [[ \$BACKED_UP -eq 0 ]]; then
+                echo \"Backups already exist — skipped\"
+            fi
+            echo \"Backup dir: \$BACKUP_DIR\"
+        '")
+        echo -e "${GREEN}${BACKUP_RESULT}${NC}"
+        CHANGES_VPS_HOST+=("Backed up sshd configs to ${UNINSTALL_DIR}/sshd/")
+
         # Find which config file sets AllowTcpForwarding and update it
         $SSH_CMD "${SUDO} bash -c '
             CONF_FILE=\$(grep -rl \"^AllowTcpForwarding\" /etc/ssh/sshd_config.d/ 2>/dev/null | head -1)
@@ -224,6 +260,10 @@ if [[ ${#CHANGES_VPS_HOST[@]} -gt 0 ]]; then
     for change in "${CHANGES_VPS_HOST[@]}"; do
         echo -e "    • $change"
     done
+    echo ""
+    echo -e "  ${RED}To restore original sshd config:${NC}"
+    echo -e "    ${CYAN}ssh <vps> sudo cp ${UNINSTALL_DIR}/sshd/sshd_config.d/*.conf /etc/ssh/sshd_config.d/${NC}"
+    echo -e "    ${CYAN}ssh <vps> sudo systemctl restart sshd${NC}"
 fi
 
 if [[ ${#CHANGES_CONTAINER[@]} -gt 0 ]]; then
