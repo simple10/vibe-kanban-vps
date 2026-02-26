@@ -1,6 +1,42 @@
 # Vibe Kanban VPS Deployment
 
-This project auto deploys [vibe-kanban](https://github.com/BloopAI/vibe-kanban) to a VPS with zero exposed ports. Traffic is routed through a Cloudflare Tunnel, and authentication is handled by Cloudflare Access.
+This project auto deploys [vibe-kanban](https://github.com/BloopAI/vibe-kanban) to a VPS with zero exposed ports (other than SSH). Traffic is routed through a Cloudflare Tunnel, and authentication is handled by Cloudflare Access.
+
+## Features
+
+- **Auto deploys Vibe Kanban** using `claude` code
+- **Safely runs in Docker container** - Vibe Kanban, cluade, codex, etc. all run in the same isolated container
+- **Helper scripts for login flows** - easy auth for github, claude, codex, etc.
+- **Remote IDE support** - `ide-ssh-setup.sh` script handles port forwarding into the Vibe Kanban container
+- **Easy customization** - just ask `claude` to add features to the Dockerfile when you need them
+- **Uninstall support** - changes to VPS system files are backed up for claude to use for rollback
+
+## Quick Start
+
+```bash
+# Clone this repo
+git clone https://github.com/simple10/vibe-kanban-vps.git && cd vibekanban-vps
+
+# Run claude
+claude "deploy"
+# Optionally add the --dangerously-skip-permissions for full auto
+
+# Auth your github & coding agent of choice
+./github-login.sh
+./claude-login.sh
+
+# Now everything is good to go!
+# Just open Vibe Kanban UI & start adding tasks
+# Claude (or codex, etc.) will have access to your github repos
+# and can start coding away! You can also have the agents perform
+# non-code tasks.
+open https://vibekanban.YOUR-DOMAIN.com
+
+# Optionally enable Remote SSH IDE editing (see below for details)
+./ide-ssh-setup.sh
+```
+
+## Overview
 
 The [Dockerfile.vps](./deploy/Dockerfile.vps) used in this project installs `vibe-kanban` using npm.
 It's equivalent to running `npx vibe-kanban` on your local machine.
@@ -20,13 +56,17 @@ Internet → Cloudflare Access → [VPS Docker Container]
 First deploy takes about 3-5 minutes to install docker & sysbox on the VPS (if needed).
 The container build is fast because `npm -g install vibe-kanban` only downloads a ~50MB rust binary.
 
+You can ask `claude` to modify this project to not use sysbox if you prefer.
+Sysbox is not required but highly recommended as it allows coding agents to spawn containers if needed.
+
 ## Prerequisites
 
-- Ubuntu VPS (tested on Ubuntu 24.04/25.04)
-- A Cloudflare account with a domain
-- A Cloudflare Tunnel token ([create one](https://one.dash.cloudflare.com/) under Networks → Tunnels)
+- Ubuntu VPS (tested on Ubuntu 24.04/25.04) - other distros should also work fine with minor modifications
+- Cloudflare Tunnel token ([create one](https://one.dash.cloudflare.com/) under Networks → Tunnels)
+- Domain in Cloudflare (optional) - you can use the Cloudflare tunnel without a domain if you prefer
 - SSH key access to the VPS (passwordless)
-- Github account (if using git with Vibe Kanban)
+- Github account (optional) - allows Vibe Kanban to interact with your repos
+- Anthropic or OpenAI account - you need at least one coding agent
 
 ## Setup
 
@@ -42,18 +82,14 @@ cp .env.example .env
 
 1. Go to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → Networks → Tunnels
 2. Create a tunnel and copy the token
-3. Add a **Public Hostname** pointing to `http://vibe-kanban:3000`
-4. (Recommended) Add a Cloudflare Access policy to protect the hostname
+3. Add a **Public Hostname** pointing to `http://vibe-kanban:3000` - or configure tunnel to use without a domain
+4. (Recommended) Add a Cloudflare Access policy to protect the tunnel when using a domain
 
 ### 3. Configure `.env`
 
 Edit `.env` and fill in the required values:
 
 ```bash
-# Claude agent: API key OR OAuth login (see below)
-# ANTHROPIC_API_KEY=sk-ant-...
-# GOOGLE_API_KEY=...
-# OPENAI_API_KEY=...
 CF_TUNNEL_TOKEN=eyJ...              # from Cloudflare Tunnels dashboard
 
 # VPS connection
@@ -66,6 +102,12 @@ SSH_PORT=22                          # default: 22
 # Your tunnel's public hostname protected by Cloudflare Access
 # If VK_DOMAIN is not set, you'll need to manually connect to the cloudflare tunnel
 VK_DOMAIN=vibekanban.example.com
+
+# Provider API Keys (optional)
+# Use the helper scripts after deploy or set API keys here
+# ANTHROPIC_API_KEY=sk-ant-...
+# GOOGLE_API_KEY=...
+# OPENAI_API_KEY=...
 ```
 
 ### 4. Deploy Using Claude Code
@@ -93,12 +135,60 @@ Use the helper scripts to authenticate Github and Claude Code.
 # Log codex CLI into OpenAI account (optional)
 ./codex-login.sh
 
+# Enable remote IDE support (optional)
+./ide-ssh-setup.sh
+
 # SSH into the vibe-kanban container for debugging
 ./ssh-vibekanban.sh
 ```
 
 NOTE: You will optionally need to sign-in to Vibe Kanban to enable the kanban features.
 Simply sign-in with your Github or Google account. No additional configuration is needed.
+
+### Remote IDE Setup
+
+Vibe Kanban supports connecting your local IDE to the VPS to edit files.
+
+This requires VS Code, Cursor, or equivalent with the Remote SSH extension installed.
+
+However, since Vibe Kanban is running in a Docker container and not on the VPS host,
+a bit of extra setup is needed to properly forward ports.
+
+```text
+Cursor (via Remote SSH extension) -> VPS -> Vibe Kanban Container
+```
+
+Simply run the `ide-ssh-setup.sh` script if you skipped it during claude's deploy.
+
+```bash
+./ide-ssh-setup.sh
+```
+
+The script makes any modifications to sshd on the VPS to enable port forwarding
+to the container. It also sets up a ssh alias for you to use with Vibe Kanban.
+
+After running the script:
+
+1. Navigate to `Settings > General` in the Vibe Kanban web UI
+2. Choose your IDE (Cursor, VS Code, etc.)
+3. Set the Remote SSH settings to:
+
+    - Remote SSH Host: `vibe-kanban`
+    - Remote SSH User: `vkuser`
+
+The host and user are created by the `ide-ssh-setup.sh` script.
+
+![Remote IDE Setup Diagram](docs/assets/vk-ssh-ide.png)
+
+That's it!
+
+Now when you edit a file via the Vibe Kanban web UI, it will:
+
+- Generate a link that opens your local IDE
+- Installs the Remote SSH extension (if missing)
+- SSH into your vibe-kanban container & load the file to edit
+
+Any edits you make are now visible to the Vibe Kanban agents.
 
 ---
 
