@@ -41,8 +41,6 @@ Before deploying, read `.env` and verify these required values are present and n
 3. **`CF_TUNNEL_TOKEN`** — Cloudflare Tunnel token
 4. At least one of: an agent API key (`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `OPENAI_API_KEY`) **or** Claude Code OAuth login (see below)
 
-5. **`VK_DOMAIN`** — If set, must not contain `<YOUR-DOMAIN>` (the placeholder from `.env.example`). If it does, stop and ask the user to either replace it with their real domain or comment it out.
-
 If `CF_TUNNEL_TOKEN` is missing, prompt with:
 > You need a Cloudflare Tunnel token. Create one at: Cloudflare Zero Trust dashboard → Networks → Tunnels → Create. Copy the token and set `CF_TUNNEL_TOKEN` in `.env`.
 
@@ -53,6 +51,23 @@ bash claude-login.sh
 ```
 
 This SSHs into the VPS, docker execs into the vibe-kanban container, and runs the Claude Code login flow. The user will see a URL to open in their browser. Credentials are persisted in `data/vk-claude/`.
+
+### Cloudflare Access Verification
+
+If `VK_DOMAIN` is set in `.env`, it must not contain `<YOUR-DOMAIN>` (the placeholder from `.env.example`). If it does, stop and ask the user to either replace it with their real domain or comment it out.
+
+If `VK_DOMAIN` is set to a real domain, verify it is protected by Cloudflare Access before deploying. Run from the local machine:
+
+```bash
+curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
+```
+
+**If 302/403 redirect** (Location header contains `cloudflareaccess.com` or `access.`): Cloudflare Access is protecting the domain. Continue to deploy.
+
+**If 200 or no redirect to Access**: The domain is **not** protected. Stop and warn the user:
+> Your domain `<VK_DOMAIN>` does not appear to be protected by Cloudflare Access. Anyone with the URL can access vibe-kanban. Configure an Access policy in the Cloudflare Zero Trust dashboard before deploying.
+
+**If connection refused / timeout**: The tunnel is not yet running or DNS is not configured. This is expected on first deploy — verify Access is configured after the tunnel is up.
 
 ## Deploying to the VPS
 
@@ -149,8 +164,14 @@ The final log should follow this structure:
 | vibe-kanban-tunnel | 0.22% | 14.7 MiB | 5.76% | 0.5 cores | 256 MiB | 128 MiB |
 ```
 
+## Step 4: IDE SSH setup (if VK_IDE_SSH=true)
+```
+<ide-ssh-setup.sh output, or "Skipped — VK_IDE_SSH not enabled" / "Skipped — user declined">
+```
+
 ## Summary
 - **Services:** vibe-kanban (running/healthy), cloudflared (running)
+- **IDE SSH:** configured / skipped
 - **Result:** SUCCESS
 ````
 
@@ -230,22 +251,25 @@ Include all running containers. Follow the table with:
    - If `VK_DOMAIN` is set in `.env`: `https://<VK_DOMAIN>`
    - If `VK_DOMAIN` is not set: tell the user to find their tunnel's public hostname in the Cloudflare Zero Trust dashboard under Networks → Tunnels → their tunnel → Public Hostname
 
-## Cloudflare Access Verification
+### Step 4: IDE SSH setup (optional)
 
-If `VK_DOMAIN` is set in `.env` but still contains `<YOUR-DOMAIN>` (the placeholder from `.env.example`), stop and ask the user to update it with their real domain or comment it out before deploying.
+After the deploy report, if `VK_IDE_SSH` is set to `true` in `.env`, ask the user if they want to run the IDE SSH setup now. Present this as a yes/no question:
 
-If `VK_DOMAIN` is set to a real domain, verify it is protected by Cloudflare Access before deploying. Run from the local machine:
+> IDE SSH is enabled. Would you like to run `ide-ssh-setup.sh` to configure your local SSH config and inject your public key into the container? This lets VS Code / Cursor connect directly into the container via Remote-SSH.
+
+If the user says yes, run:
 
 ```bash
-curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
+bash ide-ssh-setup.sh
 ```
 
-**If 302/403 redirect** (Location header contains `cloudflareaccess.com` or `access.`): Cloudflare Access is protecting the domain. Continue to next step.
+This injects the user's SSH public key into the container and adds a `Host vibe-kanban` entry to `~/.ssh/config`. After setup, `ssh vibe-kanban` connects directly into the container as `vkuser`.
 
-**If 200 or no redirect to Access**: The domain is **not** protected. Stop and warn the user:
-> Your domain `<VK_DOMAIN>` does not appear to be protected by Cloudflare Access. Anyone with the URL can access vibe-kanban. Configure an Access policy in the Cloudflare Zero Trust dashboard before deploying.
+If the script succeeds, include the setup result in the deploy log and inform the user they can now connect with `ssh vibe-kanban` or via their IDE's Remote-SSH extension (Cmd+Shift+P → "Remote-SSH: Connect to Host" → select "vibe-kanban").
 
-**If connection refused / timeout**: The tunnel is not yet running or DNS is not configured. This is expected on first deploy — verify Access is configured after the tunnel is up.
+If `VK_IDE_SSH` is not set or is `false`, skip this step silently.
+
+**Note:** Port 2222 is bound to `127.0.0.1` on the VPS (Docker daemon is configured with `"ip": "127.0.0.1"`), so it is not publicly accessible. IDE SSH connectivity depends on how `ide-ssh-setup.sh` configures the SSH client (direct or via ProxyJump).
 
 ## Environment Variables
 
@@ -274,16 +298,6 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 *At least one agent API key is required, or use Claude Code OAuth login via `claude-login.sh`.
 
 GitHub integration uses `gh` CLI (not a token). Run `bash github-login.sh` after deploying to authenticate. This also auto-configures `git user.name` and `git user.email` inside the container from the GitHub profile.
-
-## IDE Remote SSH Setup (Optional)
-
-After deploying, if the user wants to connect VS Code / Cursor directly into the container (so "Open in Cursor/VS Code" links resolve correct container paths), guide them through IDE SSH setup:
-
-1. The user must set `VK_IDE_SSH=true` in `.env` and redeploy
-2. Run `bash ide-ssh-setup.sh` — this injects their SSH public key and adds a `Host vibe-kanban` entry to `~/.ssh/config`
-3. Port `VK_SSH_PORT` (default 2222) must be open in the VPS firewall
-
-After setup, `ssh vibe-kanban` connects directly into the container as `vkuser`.
 
 ## Operations
 
@@ -391,8 +405,6 @@ docker compose logs cloudflared
 docker compose exec vibe-kanban pgrep -a sshd
 # Check VK_IDE_SSH is set
 docker compose exec vibe-kanban printenv VK_IDE_SSH
-# Test port connectivity from local machine
-ssh -p 2222 -i ~/.ssh/your_key vkuser@<VPS_IP> echo "SSH works"
 # Check authorized_keys
 cat data/vk-ssh/authorized_keys
 # Check host keys exist
@@ -401,7 +413,7 @@ ls -la data/vk-sshd/
 
 Common issues:
 - `VK_IDE_SSH` not set to `true` in `.env` — sshd won't start
-- Port 2222 blocked by VPS firewall — open it in your cloud provider's security group
+- Port 2222 is bound to `127.0.0.1` on the VPS (not publicly accessible) — IDE SSH requires proxying through VPS SSH or a tunnel
 - Public key not in `data/vk-ssh/authorized_keys` — re-run `bash ide-ssh-setup.sh`
 - "Host key changed" warning — delete old key with `ssh-keygen -R "[<VPS_IP>]:2222"`
 
