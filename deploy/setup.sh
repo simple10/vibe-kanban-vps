@@ -120,7 +120,7 @@ deploy_stack() {
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
     if [[ "${script_dir}" != "${DEPLOY_DIR}" ]]; then
-        for f in docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore; do
+        for f in docker-compose.yml Dockerfile.vps entrypoint.sh .dockerignore; do
             if [[ -f "${script_dir}/${f}" ]]; then
                 cp "${script_dir}/${f}" "${DEPLOY_DIR}/${f}"
             else
@@ -131,17 +131,9 @@ deploy_stack() {
         info "Script is running from deploy directory, skipping file copy"
     fi
 
-    # Create .env from example if it doesn't exist
+    # .env should already be present (copied by vps.sh deploy)
     if [[ ! -f "${DEPLOY_DIR}/.env" ]]; then
-        cp "${DEPLOY_DIR}/.env.example" "${DEPLOY_DIR}/.env"
-        warn "Created ${DEPLOY_DIR}/.env from template — edit it before starting!"
-        warn "  Required: ANTHROPIC_API_KEY, CF_TUNNEL_TOKEN"
-        warn "  Get tunnel token: Cloudflare Zero Trust → Networks → Tunnels → Create"
-        echo ""
-        read -rp "Edit .env now? [Y/n] " edit_env
-        if [[ "${edit_env,,}" != "n" ]]; then
-            ${EDITOR:-nano} "${DEPLOY_DIR}/.env"
-        fi
+        error "No .env found in ${DEPLOY_DIR}. Copy .env.example to .env locally, configure it, then run: bash vps.sh deploy"
     else
         info "Existing .env found, keeping it"
     fi

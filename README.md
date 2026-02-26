@@ -35,7 +35,7 @@ The container build is fast because `npm -g install vibe-kanban` only downloads 
 ```bash
 git clone https://github.com/simple10/vibe-kanban-vps.git
 cd vibekanban-vps
-cp deploy/.env.example .env
+cp .env.example .env
 ```
 
 ### 2. Create a Cloudflare Tunnel
@@ -228,7 +228,7 @@ docker compose start vibe-kanban
 | `deploy/Dockerfile.vps` | Multi-stage build (node+rust builder, ubuntu runtime) |
 | `deploy/entrypoint.sh` | Starts dockerd, then execs the server binary |
 | `deploy/docker-compose.yml` | Service definitions with sysbox-runc runtime |
-| `deploy/.env.example` | Environment variable template |
+| `.env.example` | Environment variable template |
 | `deploy/.dockerignore` | Docker build ignore rules |
 | `deploy/setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
 | `vps.sh` | SSH/SCP/deploy wrapper — reads `.env`, auto-adds sudo for non-root |

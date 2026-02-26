@@ -112,7 +112,6 @@ The final log should follow this structure:
 - deploy/docker-compose.yml
 - deploy/Dockerfile.vps
 - deploy/entrypoint.sh
-- deploy/.env.example
 - deploy/.dockerignore
 - deploy/setup.sh
 - .env
@@ -370,7 +369,7 @@ docker compose logs cloudflared
 | `deploy/Dockerfile.vps` | Multi-stage build (node+rust builder, ubuntu runtime) |
 | `deploy/entrypoint.sh` | Starts dockerd, then execs the server binary |
 | `deploy/docker-compose.yml` | Service definitions with sysbox-runc runtime |
-| `deploy/.env.example` | Example environment configuration |
+| `.env.example` | Example environment configuration |
 | `deploy/.dockerignore` | Docker build ignore rules |
 | `deploy/setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
 | `.env` | Environment configuration (secrets — stays in root) |
