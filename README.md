@@ -149,7 +149,7 @@ Use the helper scripts to authenticate Github and Claude Code.
 NOTE: You will optionally need to sign-in to Vibe Kanban to enable the kanban features.
 Simply sign-in with your Github or Google account. No additional configuration is needed.
 
-### Remote IDE Setup
+### 5. Remote IDE Setup (Optional)
 
 Vibe Kanban supports connecting your local IDE to the VPS to edit files.
 
@@ -182,7 +182,7 @@ After running the script:
 
 The host and user are created by the `ide-ssh-setup.sh` script.
 
-![Remote IDE Setup Diagram](docs/assets/vk-ssh-ide.png)
+![Remote IDE Setup Diagram](docs/assets/remote-ssh-config.png)
 
 That's it!
 
