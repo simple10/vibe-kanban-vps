@@ -58,6 +58,7 @@ All VPS operations use the `vps.sh` helper script, which reads SSH connection de
 ```bash
 bash vps.sh ssh "command to run on VPS"
 bash vps.sh scp file1 [file2...] /remote/path/
+bash vps.sh deploy    # copy deploy/ files + .env to $INSTALL_DIR on VPS
 ```
 
 ### Deploy Logging
@@ -105,16 +106,15 @@ The final log should follow this structure:
 ## Step 1: Copy deployment files
 **Commands:**
 ```
-<mkdir output>
-<scp output for each file>
+<bash vps.sh deploy output>
 ```
 **Files copied to /home/vibe-kanban/:**
-- docker-compose.yml
-- Dockerfile.vps
-- entrypoint.sh
-- .env.example
-- .dockerignore
-- setup.sh
+- deploy/docker-compose.yml
+- deploy/Dockerfile.vps
+- deploy/entrypoint.sh
+- deploy/.env.example
+- deploy/.dockerignore
+- deploy/setup.sh
 - .env
 
 ## Step 2: Run setup on VPS
@@ -148,21 +148,10 @@ The final log should follow this structure:
 
 The vibe-kanban source is **not** copied from the local machine — `setup.sh` clones it directly from GitHub on the VPS.
 
-Read `INSTALL_DIR` from `.env` (default: `/home/vibe-kanban`) and use it as the remote path.
-
-Note: `vps.sh ssh` auto-adds `sudo` for non-root users, but `vps.sh scp` runs as `SSH_USER` directly — so the directory must be owned by `SSH_USER` for scp to succeed.
+The `deploy` subcommand creates `$INSTALL_DIR` on the VPS (with `chown` for non-root SSH users), then copies all files from `deploy/` plus root `.env` flat to `$INSTALL_DIR/` in a single scp:
 
 ```bash
-# Create the deploy directory on the VPS, owned by SSH_USER so scp can write to it.
-# Use ${SSH_USER} (local variable, substituted before sending) — not $(whoami)
-# which resolves to root under sudo.
-bash vps.sh ssh "mkdir -p ${INSTALL_DIR} && chown ${SSH_USER}: ${INSTALL_DIR}"
-
-# Copy deployment files
-bash vps.sh scp docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore setup.sh ${INSTALL_DIR}/
-
-# Copy .env (contains secrets — only if it exists locally)
-bash vps.sh scp .env ${INSTALL_DIR}/.env
+bash vps.sh deploy
 ```
 
 ### Step 2: Run setup on the VPS
@@ -358,11 +347,13 @@ docker compose logs cloudflared
 
 | File | Purpose |
 |---|---|
-| `Dockerfile.vps` | Multi-stage build (node+rust builder, ubuntu runtime) |
-| `entrypoint.sh` | Starts dockerd, then execs the server binary |
-| `docker-compose.yml` | Service definitions with sysbox-runc runtime |
-| `.env` / `.env.example` | Environment configuration |
-| `setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
-| `vps.sh` | SSH/SCP wrapper — reads `.env`, auto-adds sudo for non-root |
+| `deploy/Dockerfile.vps` | Multi-stage build (node+rust builder, ubuntu runtime) |
+| `deploy/entrypoint.sh` | Starts dockerd, then execs the server binary |
+| `deploy/docker-compose.yml` | Service definitions with sysbox-runc runtime |
+| `deploy/.env.example` | Example environment configuration |
+| `deploy/.dockerignore` | Docker build ignore rules |
+| `deploy/setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
+| `.env` | Environment configuration (secrets — stays in root) |
+| `vps.sh` | SSH/SCP/deploy wrapper — reads `.env`, auto-adds sudo for non-root |
 | `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |
 | `github-login.sh` | Helper to run GitHub CLI OAuth login inside the container |
