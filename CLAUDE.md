@@ -140,7 +140,10 @@ The final log should follow this structure:
 
 ### Container resources
 ```
-<docker inspect resource output>
+| Container | CPU % | Mem Usage | Mem % | CPU Limit | Mem Limit | Mem Reserve |
+|---|---|---|---|---|---|---|
+| vibe-kanban | 0.12% | 629 MiB | 0.67% | 8 cores | 8 GiB | 2 GiB |
+| vibe-kanban-tunnel | 0.22% | 14.7 MiB | 5.76% | 0.5 cores | 256 MiB | 128 MiB |
 ```
 
 ## Summary
@@ -202,18 +205,24 @@ bash vps.sh ssh "cd ${INSTALL_DIR} && docker compose logs --tail=20 cloudflared"
 
 Look for `"Connection registered"` in the output. If absent, warn the user the tunnel may not be connected yet.
 
-**Check container resource limits:**
+**Check container resources (live usage + limits):**
 
 ```bash
-bash vps.sh ssh "docker inspect vibe-kanban --format '{{.HostConfig.NanoCpus}} CPUs, {{.HostConfig.Memory}} memory'"
+bash vps.sh ssh 'docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"'
+bash vps.sh ssh 'docker inspect --format "{{.Name}}: CPU={{.HostConfig.NanoCpus}} Memory={{.HostConfig.Memory}} CPUReserve={{.HostConfig.CpuShares}} MemReserve={{.HostConfig.MemoryReservation}}" $(docker ps -q)'
 ```
 
-Include the resource limits (CPU, memory) in the deploy log and report so the user can verify their `.env` resource settings took effect.
+Convert NanoCpus to cores (÷ 1e9), Memory/MemReserve to human-readable (GiB/MiB).
 
-**Present a deploy report to the user** with this information:
+**Present a deploy report to the user** as a markdown table with these columns:
 
-1. **Services status** — list each service and its state (running/healthy, starting, exited, etc.)
-2. **Files modified on VPS** — list the deployment files that were copied to `$INSTALL_DIR` and whether vibe-kanban source was cloned/updated
+| Container | CPU % | Mem Usage | Mem % | CPU Limit | Mem Limit | Mem Reserve |
+|---|---|---|---|---|---|---|
+
+Include all running containers. Follow the table with:
+
+1. **Services status** — note any unhealthy or missing services
+2. **Files deployed** — list the deployment files copied to `$INSTALL_DIR`
 3. **How to access vibe-kanban:**
    - If `VK_DOMAIN` is set in `.env`: `https://<VK_DOMAIN>`
    - If `VK_DOMAIN` is not set: tell the user to find their tunnel's public hostname in the Cloudflare Zero Trust dashboard under Networks → Tunnels → their tunnel → Public Hostname
