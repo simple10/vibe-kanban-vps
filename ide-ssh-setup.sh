@@ -93,7 +93,7 @@ echo -e "${GREEN}Using public key:${NC} ${PUB_KEY_PATH}"
 # --- Inject public key into container ----------------------------------------
 echo -e "${YELLOW}Injecting SSH public key into vibe-kanban container...${NC}"
 
-AUTH_KEYS_DIR="${INSTALL_DIR}/data/vk-ssh"
+AUTH_KEYS_DIR="${INSTALL_DIR}/data/ssh"
 AUTH_KEYS_FILE="${AUTH_KEYS_DIR}/authorized_keys"
 
 # Create authorized_keys if missing, append key if not already present

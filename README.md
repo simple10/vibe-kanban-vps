@@ -260,6 +260,7 @@ Access vibe-kanban at the public hostname you configured in Cloudflare Tunnels.
 
 In general, just use `claude` to do everything for you:
 
+- `claude "create a backup of all the vibe-kanban data and scp it to my local machine"`
 - `claude "restart vibe-kanban"`
 - `claude "debug why I can't reach the Vibe Kanban web UI"`
 - `claude "upgrade Vibe Kanban to the latest version"`
@@ -286,14 +287,14 @@ git -C vibe-kanban pull
 docker compose up -d --build
 
 # Backup SQLite DB (bind mount — direct host access)
-cp data/vk-data/db.v2.sqlite ./backup-$(date +%Y%m%d).sqlite
+cp data/vibe-kanban/db.v2.sqlite ./backup-$(date +%Y%m%d).sqlite
 
 # Backup all data
 tar czf vk-backup-$(date +%Y%m%d).tar.gz data/
 
 # Restore SQLite DB
 docker compose stop vibe-kanban
-cp ./backup.sqlite data/vk-data/db.v2.sqlite
+cp ./backup.sqlite data/vibe-kanban/db.v2.sqlite
 docker compose start vibe-kanban
 ```
 

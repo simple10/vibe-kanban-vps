@@ -9,14 +9,14 @@ services:
     ports:
       - "${VK_SSH_PORT:-2222}:2222"
     volumes:
-      - ./data/vk-data:/home/vkuser/.local/share/vibe-kanban  # SQLite DB + config
-      - ./data/vk-repos:/repos                                 # Cloned repositories
-      - ./data/vk-worktrees:/var/tmp/vibe-kanban                # Worktrees
-      - ./data/vk-docker:/var/lib/docker                        # Docker-in-Docker storage
-      - ./data/vk-claude:/home/vkuser/.claude                   # Claude Code OAuth credentials
-      - ./data/vk-ghcli:/home/vkuser/.config/gh                 # GitHub CLI OAuth credentials
-      - ./data/vk-ssh:/home/vkuser/.ssh                         # SSH keys for git push
-      - ./data/vk-sshd:/etc/ssh/sshd_host_keys                    # sshd host keys (IDE SSH)
+      - ./data/vibe-kanban:/home/vkuser/.local/share/vibe-kanban  # SQLite DB + config
+      - ./data/repos:/repos                                      # Cloned repositories
+      - ./data/worktrees:/var/tmp/vibe-kanban                    # Worktrees
+      - ./data/docker:/var/lib/docker                            # Docker-in-Docker storage
+      - ./data/claude:/home/vkuser/.claude                       # Claude Code OAuth credentials
+      - ./data/ghcli:/home/vkuser/.config/gh                     # GitHub CLI OAuth credentials
+      - ./data/ssh:/home/vkuser/.ssh                             # SSH keys for git push
+      - ./data/sshd:/etc/ssh/sshd_host_keys                     # sshd host keys (IDE SSH)
     env_file:
       - .env
     environment:
