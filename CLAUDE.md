@@ -261,19 +261,25 @@ Include all running containers. Follow the table with:
 
 ### Step 4: IDE SSH setup (optional)
 
-After the deploy report, if `VK_IDE_SSH` is set to `true` in `.env`, ask the user if they want to run the IDE SSH setup now. Present this as a yes/no question:
+After the deploy report, if `VK_IDE_SSH` is set to `true` in `.env`, proceed with IDE SSH setup. If `VK_IDE_SSH` is not set or is `false`, skip this step silently.
 
-> IDE SSH is enabled. Would you like to run `ide-ssh-setup.sh` to configure your local SSH config and inject your public key into the container? This lets VS Code / Cursor connect directly into the container via Remote-SSH.
-
-If the user says yes, run:
+**Check AllowTcpForwarding status** on the VPS first:
 
 ```bash
-bash ide-ssh-setup.sh
+bash vps.sh ssh "sshd -T 2>/dev/null | grep -i allowtcpforwarding"
 ```
 
-The script is interactive — it will prompt the user if VPS host changes are needed (e.g., changing `AllowTcpForwarding` in sshd config). Let the script handle the prompts directly.
+If the value is `no` (not `yes` or `local`), inform the user that a VPS host change is required and get confirmation before proceeding:
 
-If `VK_IDE_SSH` is not set or is `false`, skip this step silently.
+> IDE SSH requires `AllowTcpForwarding local` in the VPS sshd config (currently `no`). This change only permits forwarding to 127.0.0.1 — no remote forwarding. The script will also back up the original sshd config. Proceed?
+
+Once confirmed (or if AllowTcpForwarding is already `yes` or `local`), run the script non-interactively:
+
+```bash
+bash ide-ssh-setup.sh --yes
+```
+
+The `--yes` flag auto-accepts the AllowTcpForwarding prompt so the script runs without interactive input.
 
 **After the script completes**, capture its output in the deploy log. Pay special attention to the "Summary of Changes" section the script prints. In the deploy log, you **must** separately list any VPS host changes (changes outside the container) under a `### VPS host changes (outside container)` heading. This includes:
 

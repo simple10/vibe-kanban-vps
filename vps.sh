@@ -34,7 +34,8 @@ case "${1:-}" in
         if [[ "${SSH_USER}" == "root" ]]; then
             ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}" "$*"
         else
-            ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}" "sudo -s -- eval '$*'"
+            printf -v _remote_cmd 'sudo bash -c %q' "$*"
+            ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}" "${_remote_cmd}"
         fi
         ;;
     scp)
@@ -51,7 +52,8 @@ case "${1:-}" in
         if [[ "${SSH_USER}" == "root" ]]; then
             ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}" "mkdir -p ${INSTALL_DIR}"
         else
-            ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}" "sudo -s -- eval 'mkdir -p ${INSTALL_DIR} && chown ${SSH_USER}: ${INSTALL_DIR}'"
+            printf -v _remote_cmd 'sudo bash -c %q' "mkdir -p ${INSTALL_DIR} && chown ${SSH_USER}: ${INSTALL_DIR}"
+            ssh -i "${SSH_KEY_PATH}" -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${VPS_IP}" "${_remote_cmd}"
         fi
 
         # Collect deploy/ files (including dotfiles) + root .env

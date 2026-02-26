@@ -6,7 +6,7 @@ set -euo pipefail
 # Injects your SSH public key into the vibe-kanban container so VS Code / Cursor
 # can connect via Remote-SSH. Optionally adds a Host entry to ~/.ssh/config.
 #
-# Usage: bash ide-ssh-setup.sh [--key <path>] [--no-config]
+# Usage: bash ide-ssh-setup.sh [--key <path>] [--no-config] [--yes|-y]
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,6 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # --- Parse flags -------------------------------------------------------------
 PUB_KEY_PATH=""
 SKIP_CONFIG=false
+AUTO_YES=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -25,9 +26,13 @@ while [[ $# -gt 0 ]]; do
             SKIP_CONFIG=true
             shift
             ;;
+        --yes|-y)
+            AUTO_YES=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1" >&2
-            echo "Usage: bash ide-ssh-setup.sh [--key <path-to-public-key>] [--no-config]" >&2
+            echo "Usage: bash ide-ssh-setup.sh [--key <path-to-public-key>] [--no-config] [--yes|-y]" >&2
             exit 1
             ;;
     esac
@@ -57,7 +62,7 @@ if [[ "${SSH_USER}" != "root" ]]; then
     SUDO="sudo"
 fi
 
-SSH_CMD="ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ${SSH_USER}@${VPS_IP}"
+SSH_CMD="ssh -n -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ${SSH_USER}@${VPS_IP}"
 
 # --- Colors ------------------------------------------------------------------
 RED='\033[0;31m'
@@ -146,8 +151,12 @@ else
     echo -e "  ${CYAN}File: /etc/ssh/sshd_config.d/hardening.conf${NC}"
     echo -e "  ${CYAN}Change: AllowTcpForwarding ${TCP_FWD} → AllowTcpForwarding local${NC}"
     echo ""
-    read -r -p "  Apply this change and restart sshd? [y/N] " REPLY
-    echo ""
+    if [[ "$AUTO_YES" == "true" ]]; then
+        REPLY=y
+    else
+        read -r -p "  Apply this change and restart sshd? [y/N] " REPLY
+        echo ""
+    fi
 
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
         # Back up sshd config files before modifying
