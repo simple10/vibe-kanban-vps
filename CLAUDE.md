@@ -239,6 +239,10 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 | `SSH_USER` | No | SSH username (default: `root`) |
 | `SSH_PORT` | No | SSH port (default: `22`) |
 | `INSTALL_DIR` | No | Install directory on VPS (default: `/home/vibe-kanban`) |
+| `VK_CPU_LIMIT` | No | Max CPU cores for vibe-kanban container (default: `4`) |
+| `VK_MEM_LIMIT` | No | Max memory for vibe-kanban container (default: `8g`) |
+| `VK_CPU_RESERVE` | No | Guaranteed CPU cores for vibe-kanban container (default: `1`) |
+| `VK_MEM_RESERVE` | No | Guaranteed memory for vibe-kanban container (default: `2g`) |
 | `RUST_LOG` | No | Log level (default: `info`) |
 | `GIT_AUTHOR_NAME` | No | Git commit author name |
 | `GIT_AUTHOR_EMAIL` | No | Git commit author email |

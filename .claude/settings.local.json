@@ -10,7 +10,8 @@
       "Bash(ssh:*)",
       "Bash(scp:*)",
       "Bash(test:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(curl:*)"
     ]
   }
 }

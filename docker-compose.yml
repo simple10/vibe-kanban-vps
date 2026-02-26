@@ -20,6 +20,15 @@ services:
       HOST: "0.0.0.0" # Expose vibe-kanban to the cloudflared tunnel - does not expose to internet
       PORT: "3000"
       HOME: /home/vkuser
+    memswap_limit: "${VK_MEM_LIMIT:-8g}"
+    deploy:
+      resources:
+        limits:
+          cpus: "${VK_CPU_LIMIT:-4}"
+          memory: "${VK_MEM_LIMIT:-8g}"
+        reservations:
+          cpus: "${VK_CPU_RESERVE:-1}"
+          memory: "${VK_MEM_RESERVE:-2g}"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
@@ -34,6 +43,15 @@ services:
     command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
     environment:
       CF_TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN}
+    memswap_limit: 256m
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+        reservations:
+          cpus: "0.1"
+          memory: 128m
     depends_on:
       vibe-kanban:
         condition: service_healthy
