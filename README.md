@@ -216,9 +216,7 @@ For subsequent deploys (pulls latest source, rebuilds, and restarts):
 bash vps.sh ssh "bash /home/vibe-kanban/setup.sh"
 ```
 
----
-
-### 5. Verify
+#### Post Deploy Verify
 
 Claude will verify everything for you after first deploy.
 The following steps are only if you want to manually verify.
@@ -235,58 +233,7 @@ bash vps.sh ssh "cd /home/vibe-kanban && docker compose logs --tail=20 cloudflar
 
 Access vibe-kanban at the public hostname you configured in Cloudflare Tunnels.
 
-### 6. (Optional) Claude Code OAuth Login
-
-You can use your Claude Pro/Max/Teams/Enterprise subscription via OAuth. After deploying, run:
-
-```bash
-bash claude-login.sh
-```
-
-This SSHs into the VPS, opens a shell inside the vibe-kanban container, and runs the Claude Code login flow. You'll see a URL — open it in your browser to authorize. Credentials are persisted across container restarts in a Docker volume.
-
-### 7. (Optional) GitHub Integration
-
-vibe-kanban uses the GitHub CLI (`gh`) for PR creation — not a `GITHUB_TOKEN`. After deploying, run:
-
-```bash
-bash github-login.sh
-```
-
-This SSHs into the container and runs `gh auth login`. You'll get a URL and a one-time code to authorize in your browser. After login, it also auto-configures `git user.name` and `git user.email` inside the container from your GitHub profile and adds a generated ssh key to your Github account. Credentials are persisted in a Docker volume.
-
-### 8. (Optional) IDE Remote SSH (VS Code / Cursor)
-
-You can connect VS Code or Cursor directly into the vibe-kanban container via SSH. This lets "Open in Cursor/VS Code" links from the web UI open the correct container-internal paths (e.g., `/repos/`, worktree directories).
-
-1. Enable IDE SSH in `.env`:
-
-```bash
-VK_IDE_SSH=true
-# VK_SSH_PORT=2222   # default port, change if needed
-```
-
-1. Redeploy to start sshd inside the container:
-
-```bash
-claude "deploy"
-# or: bash vps.sh ssh "cd /home/vibe-kanban && docker compose up -d --build"
-```
-
-1. Run the setup script to inject your SSH key and configure your local SSH config:
-
-```bash
-bash ide-ssh-setup.sh
-```
-
-1. Connect:
-
-```bash
-ssh vibe-kanban    # terminal
-# Or in VS Code/Cursor: Cmd+Shift+P → "Remote-SSH: Connect to Host" → vibe-kanban
-```
-
-> **Firewall warning:** Port 2222 (or your custom `VK_SSH_PORT`) must be open in your VPS firewall. The SSH server uses key-only authentication (no passwords), but you should still restrict access via firewall rules or security groups.
+---
 
 ## Environment Variables
 
@@ -307,16 +254,24 @@ ssh vibe-kanban    # terminal
 | `GIT_AUTHOR_NAME` | No | Git commit author name |
 | `GIT_AUTHOR_EMAIL` | No | Git commit author email |
 
-*At least one agent API key is required, or use Claude Code OAuth login via `claude-login.sh`.
-
-GitHub integration uses `gh` CLI auth — run `bash github-login.sh` after deploying (see step 7).
+*At least one agent API key is required unless you use the login helper scripts after deploy.
 
 ## Operations
 
-All commands below are run on the VPS. If using a non-root SSH user, prefix `docker` commands with `sudo`.
+In general, just use `claude` to do everything for you:
+
+- `claude "restart vibe-kanban"`
+- `claude "debug why I can't reach the Vibe Kanban web UI"`
+- `claude "upgrade Vibe Kanban to the latest version"`
+
+The blow commands are for reference if you want to manually manage everything.
 
 ```bash
-cd /home/vibe-kanban
+# SSH into the VPS
+./ssh-vps.sh
+
+# On the VPS...
+cd /home/vibe-kanban # Or wherever you installed vibe-kanban
 
 # Logs
 docker compose logs -f                # all services
@@ -370,6 +325,10 @@ docker compose start vibe-kanban
 | `CLAUDE.md` | Instructions for Claude Code to deploy and operate the stack |
 
 ## Troubleshooting
+
+Just chat with `claude` to troubleshoot (recommended).
+
+The below commands are for manual troubleshooting.
 
 **Container won't start** — Check logs and sysbox status:
 
