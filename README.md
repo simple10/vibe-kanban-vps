@@ -2,7 +2,7 @@
 
 This project auto deploys [vibe-kanban](https://github.com/BloopAI/vibe-kanban) to a VPS with zero exposed ports. Traffic is routed through a Cloudflare Tunnel, and authentication is handled by Cloudflare Access.
 
-The [Dockerfile.vps](./Dockerfile.vps) used in this project installs `vibe-kanban` using npm.
+The [Dockerfile.vps](./deploy/Dockerfile.vps) used in this project installs `vibe-kanban` using npm.
 It's equivalent to running `npx vibe-kanban` on your local machine.
 
 You can optionally modify this project (via claude code) to use vibe-kanban's self hosted deployment
@@ -35,7 +35,7 @@ The container build is fast because `npm -g install vibe-kanban` only downloads 
 ```bash
 git clone https://github.com/simple10/vibe-kanban-vps.git
 cd vibekanban-vps
-cp .env.example .env
+cp deploy/.env.example .env
 ```
 
 ### 2. Create a Cloudflare Tunnel
@@ -89,9 +89,12 @@ Use the helper scripts to authenticate Github and Claude Code.
 
 # Log claude code into anthropic subscription (optional)
 ./claude-login.sh
-# Claude may loop on the login flow
-# Just manually exit claude after completing the login flow one time
-# Credentials are persisted in the vk-claude docker volume
+
+# Log codex CLI into OpenAI account (optional)
+./codex-login.sh
+
+# SSH into the vibe-kanban container for debugging
+./ssh-vibekanban.sh
 ```
 
 NOTE: You will optionally need to sign-in to Vibe Kanban to enable the kanban features.
@@ -106,24 +109,17 @@ If not using `claude` to deploy for you, follow these instructions.
 Copy deployment files to the VPS and run the setup script.
 
 ```bash
-# Create deploy directory and copy deployment files
-ssh -i ~/.ssh/vps1_vibekanban_ed25519 root@YOUR_VPS_IP \
-    "mkdir -p /home/vibe-kanban"
-
-scp -i ~/.ssh/vps1_vibekanban_ed25519 \
-    docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore setup.sh .env \
-    root@YOUR_VPS_IP:/home/vibe-kanban/
+# Copy deployment files to the VPS (uses vps.sh helper)
+bash vps.sh deploy
 
 # First-time setup (installs Docker + Sysbox, clones vibe-kanban, builds, and starts)
-ssh -i ~/.ssh/vps1_vibekanban_ed25519 root@YOUR_VPS_IP \
-    "bash /home/vibe-kanban/setup.sh"
+bash vps.sh ssh "bash /home/vibe-kanban/setup.sh"
 ```
 
 For subsequent deploys (pulls latest source, rebuilds, and restarts):
 
 ```bash
-ssh -i ~/.ssh/vps1_vibekanban_ed25519 root@YOUR_VPS_IP \
-    "bash /home/vibe-kanban/setup.sh"
+bash vps.sh ssh "bash /home/vibe-kanban/setup.sh"
 ```
 
 ---
@@ -134,15 +130,13 @@ Claude will verify everything for you after first deploy.
 The following steps are only if you want to manually verify.
 
 ```bash
-ssh -i ~/.ssh/vps1_vibekanban_ed25519 root@YOUR_VPS_IP \
-    "cd /home/vibe-kanban && docker compose ps"
+bash vps.sh ssh "cd /home/vibe-kanban && docker compose ps"
 ```
 
 Both `vibe-kanban` and `cloudflared` should show as running. Check the tunnel logs for `"Connection registered"`:
 
 ```bash
-ssh -i ~/.ssh/vps1_vibekanban_ed25519 root@YOUR_VPS_IP \
-    "cd /home/vibe-kanban && docker compose logs --tail=20 cloudflared"
+bash vps.sh ssh "cd /home/vibe-kanban && docker compose logs --tail=20 cloudflared"
 ```
 
 Access vibe-kanban at the public hostname you configured in Cloudflare Tunnels.
@@ -207,14 +201,16 @@ docker compose restart
 git -C vibe-kanban pull
 docker compose up -d --build
 
-# Backup SQLite DB
-docker compose exec vibe-kanban cp /root/.local/share/vibe-kanban/db.v2.sqlite /tmp/backup.sqlite
-docker compose cp vibe-kanban:/tmp/backup.sqlite ./backup-$(date +%Y%m%d).sqlite
+# Backup SQLite DB (bind mount — direct host access)
+cp data/vk-data/db.v2.sqlite ./backup-$(date +%Y%m%d).sqlite
+
+# Backup all data
+tar czf vk-backup-$(date +%Y%m%d).tar.gz data/
 
 # Restore SQLite DB
-docker compose cp ./backup.sqlite vibe-kanban:/tmp/restore.sqlite
-docker compose exec vibe-kanban cp /tmp/restore.sqlite /root/.local/share/vibe-kanban/db.v2.sqlite
-docker compose restart vibe-kanban
+docker compose stop vibe-kanban
+cp ./backup.sqlite data/vk-data/db.v2.sqlite
+docker compose start vibe-kanban
 ```
 
 ## How It Works
@@ -229,13 +225,18 @@ docker compose restart vibe-kanban
 
 | File | Purpose |
 |---|---|
-| `Dockerfile.vps` | Multi-stage build (node+rust builder, ubuntu runtime) |
-| `entrypoint.sh` | Starts dockerd, then execs the server binary |
-| `docker-compose.yml` | Service definitions with sysbox-runc runtime |
-| `.env.example` | Environment variable template |
-| `setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
+| `deploy/Dockerfile.vps` | Multi-stage build (node+rust builder, ubuntu runtime) |
+| `deploy/entrypoint.sh` | Starts dockerd, then execs the server binary |
+| `deploy/docker-compose.yml` | Service definitions with sysbox-runc runtime |
+| `deploy/.env.example` | Environment variable template |
+| `deploy/.dockerignore` | Docker build ignore rules |
+| `deploy/setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
+| `vps.sh` | SSH/SCP/deploy wrapper — reads `.env`, auto-adds sudo for non-root |
 | `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |
+| `codex-login.sh` | Helper to run OpenAI Codex CLI login inside the container |
 | `github-login.sh` | Helper to run GitHub CLI OAuth login inside the container |
+| `ssh-vps.sh` | SSH into the VPS host |
+| `ssh-vibekanban.sh` | SSH into the VPS and exec into the vibe-kanban container |
 | `CLAUDE.md` | Instructions for Claude Code to deploy and operate the stack |
 
 ## Troubleshooting
@@ -262,8 +263,8 @@ docker compose logs cloudflared
 
 Common issues: invalid/expired `CF_TUNNEL_TOKEN`, missing public hostname config in CF dashboard, vibe-kanban not healthy yet.
 
-**Permission denied errors** — The container uses root internally (sysbox isolates it). If volume permissions break:
+**Permission denied errors** — The container uses root internally (sysbox isolates it). If bind mount permissions break:
 
 ```bash
-docker compose down -v && docker compose up -d
+chown -R root:root data/ && docker compose restart
 ```

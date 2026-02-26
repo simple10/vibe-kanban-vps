@@ -148,6 +148,9 @@ deploy_stack() {
 }
 
 start_stack() {
+    info "Creating bind mount directories..."
+    mkdir -p "$DEPLOY_DIR"/data/{vk-data,vk-repos,vk-worktrees,vk-docker,vk-claude,vk-ghcli,vk-ssh}
+
     info "Building and starting vibe-kanban stack..."
     cd "$DEPLOY_DIR"
     docker compose up -d --build

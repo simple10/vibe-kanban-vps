@@ -49,7 +49,7 @@ If no `ANTHROPIC_API_KEY` is set, ask the user if they want to use Claude Code O
 bash claude-login.sh
 ```
 
-This SSHs into the VPS, docker execs into the vibe-kanban container, and runs the Claude Code login flow. The user will see a URL to open in their browser. Credentials are persisted in the `vk-claude` volume.
+This SSHs into the VPS, docker execs into the vibe-kanban container, and runs the Claude Code login flow. The user will see a URL to open in their browser. Credentials are persisted in `data/vk-claude/`.
 
 ## Deploying to the VPS
 
@@ -139,6 +139,11 @@ The final log should follow this structure:
 <vibe-kanban logs>
 ```
 
+### Container resources
+```
+<docker inspect resource output>
+```
+
 ## Summary
 - **Services:** vibe-kanban (running/healthy), cloudflared (running)
 - **Result:** SUCCESS
@@ -197,6 +202,14 @@ bash vps.sh ssh "cd ${INSTALL_DIR} && docker compose logs --tail=20 cloudflared"
 ```
 
 Look for `"Connection registered"` in the output. If absent, warn the user the tunnel may not be connected yet.
+
+**Check container resource limits:**
+
+```bash
+bash vps.sh ssh "docker inspect vibe-kanban --format '{{.HostConfig.NanoCpus}} CPUs, {{.HostConfig.Memory}} memory'"
+```
+
+Include the resource limits (CPU, memory) in the deploy log and report so the user can verify their `.env` resource settings took effect.
 
 **Present a deploy report to the user** with this information:
 
@@ -277,17 +290,22 @@ docker compose up -d --build         # rebuilds image with latest npm package
 ### Backup SQLite DB
 
 ```bash
-# Copy DB from the named volume
-docker compose exec vibe-kanban cp /root/.local/share/vibe-kanban/db.v2.sqlite /tmp/backup.sqlite
-docker compose cp vibe-kanban:/tmp/backup.sqlite ./backup-$(date +%Y%m%d).sqlite
+# Copy directly from the bind mount on the host
+cp data/vk-data/db.v2.sqlite ./backup-$(date +%Y%m%d).sqlite
+```
+
+### Backup all data
+
+```bash
+tar czf vk-backup-$(date +%Y%m%d).tar.gz data/
 ```
 
 ### Restore SQLite DB
 
 ```bash
-docker compose cp ./backup.sqlite vibe-kanban:/tmp/restore.sqlite
-docker compose exec vibe-kanban cp /tmp/restore.sqlite /root/.local/share/vibe-kanban/db.v2.sqlite
-docker compose restart vibe-kanban
+docker compose stop vibe-kanban
+cp ./backup.sqlite data/vk-data/db.v2.sqlite
+docker compose start vibe-kanban
 ```
 
 ### Verify Docker-in-Docker
@@ -297,17 +315,19 @@ docker compose exec vibe-kanban docker info
 docker compose exec vibe-kanban docker run --rm alpine echo "Docker works inside sysbox"
 ```
 
-## Data Locations (inside container)
+## Data Locations
 
-| Path | Volume | Purpose |
+All persistent data is stored in bind mounts under `$INSTALL_DIR/data/` on the VPS, making backups straightforward (`cp`, `rsync`, `tar`).
+
+| Container path | Host bind mount | Purpose |
 |---|---|---|
-| `/home/vkuser/.local/share/vibe-kanban/` | `vk-data` | SQLite DB, config, profiles, credentials |
-| `/repos/` | `vk-repos` | Cloned repositories |
-| `/var/tmp/vibe-kanban/` | `vk-worktrees` | Git worktrees for agents |
-| `/var/lib/docker/` | `vk-docker` | Docker-in-Docker storage |
-| `/home/vkuser/.claude/` | `vk-claude` | Claude Code OAuth credentials |
-| `/home/vkuser/.config/gh/` | `vk-ghcli` | GitHub CLI OAuth credentials |
-| `/home/vkuser/.ssh/` | `vk-ssh` | SSH keys for git push to GitHub |
+| `/home/vkuser/.local/share/vibe-kanban/` | `data/vk-data/` | SQLite DB, config, profiles, credentials |
+| `/repos/` | `data/vk-repos/` | Cloned repositories |
+| `/var/tmp/vibe-kanban/` | `data/vk-worktrees/` | Git worktrees for agents |
+| `/var/lib/docker/` | `data/vk-docker/` | Docker-in-Docker storage |
+| `/home/vkuser/.claude/` | `data/vk-claude/` | Claude Code OAuth credentials |
+| `/home/vkuser/.config/gh/` | `data/vk-ghcli/` | GitHub CLI OAuth credentials |
+| `/home/vkuser/.ssh/` | `data/vk-ssh/` | SSH keys for git push to GitHub |
 
 ## Troubleshooting
 
@@ -341,7 +361,7 @@ docker compose logs cloudflared
 ### "permission denied" errors
 
 - The container runs as root internally (sysbox maps this to unprivileged host user)
-- If volume permissions are wrong, try: `docker compose down -v && docker compose up -d`
+- If bind mount permissions are wrong, try: `chown -R root:root data/ && docker compose restart`
 
 ## File Reference
 
@@ -356,4 +376,7 @@ docker compose logs cloudflared
 | `.env` | Environment configuration (secrets — stays in root) |
 | `vps.sh` | SSH/SCP/deploy wrapper — reads `.env`, auto-adds sudo for non-root |
 | `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |
+| `codex-login.sh` | Helper to run OpenAI Codex CLI login inside the container |
 | `github-login.sh` | Helper to run GitHub CLI OAuth login inside the container |
+| `ssh-vps.sh` | SSH into the VPS host |
+| `ssh-vibekanban.sh` | SSH into the VPS and exec into the vibe-kanban container |
