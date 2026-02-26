@@ -172,20 +172,20 @@ VK_IDE_SSH=true
 # VK_SSH_PORT=2222   # default port, change if needed
 ```
 
-2. Redeploy to start sshd inside the container:
+1. Redeploy to start sshd inside the container:
 
 ```bash
 claude "deploy"
 # or: bash vps.sh ssh "cd /home/vibe-kanban && docker compose up -d --build"
 ```
 
-3. Run the setup script to inject your SSH key and configure your local SSH config:
+1. Run the setup script to inject your SSH key and configure your local SSH config:
 
 ```bash
 bash ide-ssh-setup.sh
 ```
 
-4. Connect:
+1. Connect:
 
 ```bash
 ssh vibe-kanban    # terminal
@@ -304,3 +304,14 @@ Common issues: invalid/expired `CF_TUNNEL_TOKEN`, missing public hostname config
 ```bash
 chown -R root:root data/ && docker compose restart
 ```
+
+## Reference
+
+### Vibe Kanban Docs
+
+- [Vibe Kanban Docs](https://www.vibekanban.com/docs/getting-started)
+- [Vibe Kanban Github](https://github.com/BloopAI/vibe-kanban)
+
+### Related Projects
+
+- [OpenCode-Vibe-Kanban-Docker](https://github.com/ahkimkoo/OpenCode-Vibe-Kanban-Docker) - similar setup but adds OpenCode web server
