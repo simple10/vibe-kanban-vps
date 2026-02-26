@@ -40,6 +40,8 @@ Before deploying, read `.env` and verify these required values are present and n
 3. **`CF_TUNNEL_TOKEN`** — Cloudflare Tunnel token
 4. At least one of: an agent API key (`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `OPENAI_API_KEY`) **or** Claude Code OAuth login (see below)
 
+5. **`VK_DOMAIN`** — If set, must not contain `<YOUR-DOMAIN>` (the placeholder from `.env.example`). If it does, stop and ask the user to either replace it with their real domain or comment it out.
+
 If `CF_TUNNEL_TOKEN` is missing, prompt with:
 > You need a Cloudflare Tunnel token. Create one at: Cloudflare Zero Trust dashboard → Networks → Tunnels → Create. Copy the token and set `CF_TUNNEL_TOKEN` in `.env`.
 
@@ -229,7 +231,9 @@ Include all running containers. Follow the table with:
 
 ## Cloudflare Access Verification
 
-If `VK_DOMAIN` is set in `.env`, verify the domain is protected by Cloudflare Access before deploying. Run from the local machine:
+If `VK_DOMAIN` is set in `.env` but still contains `<YOUR-DOMAIN>` (the placeholder from `.env.example`), stop and ask the user to update it with their real domain or comment it out before deploying.
+
+If `VK_DOMAIN` is set to a real domain, verify it is protected by Cloudflare Access before deploying. Run from the local machine:
 
 ```bash
 curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
