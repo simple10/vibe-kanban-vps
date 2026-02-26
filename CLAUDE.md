@@ -144,11 +144,15 @@ The final log should follow this structure:
 
 The vibe-kanban source is **not** copied from the local machine — `setup.sh` clones it directly from GitHub on the VPS.
 
-Read `INSTALL_DIR` from `.env` (default: `/home/vibe-kanban`) and use it as the remote path:
+Read `INSTALL_DIR` from `.env` (default: `/home/vibe-kanban`) and use it as the remote path.
+
+Note: `vps.sh ssh` auto-adds `sudo` for non-root users, but `vps.sh scp` runs as `SSH_USER` directly — so the directory must be owned by `SSH_USER` for scp to succeed.
 
 ```bash
-# Create the deploy directory on the VPS
-bash vps.sh ssh "mkdir -p ${INSTALL_DIR} && chown \$(whoami): ${INSTALL_DIR}"
+# Create the deploy directory on the VPS, owned by SSH_USER so scp can write to it.
+# Use ${SSH_USER} (local variable, substituted before sending) — not $(whoami)
+# which resolves to root under sudo.
+bash vps.sh ssh "mkdir -p ${INSTALL_DIR} && chown ${SSH_USER}: ${INSTALL_DIR}"
 
 # Copy deployment files
 bash vps.sh scp docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore setup.sh ${INSTALL_DIR}/
