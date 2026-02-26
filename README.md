@@ -17,6 +17,10 @@ This project auto deploys [vibe-kanban](https://github.com/BloopAI/vibe-kanban) 
 # Clone this repo
 git clone https://github.com/simple10/vibe-kanban-vps.git && cd vibekanban-vps
 
+# Edit the required .env settings (VPS_IP, CF_TUNNEL_TOKEN, etc.)
+cp .env.example .env
+open .env
+
 # Run claude
 claude "deploy"
 # Optionally add the --dangerously-skip-permissions for full auto
