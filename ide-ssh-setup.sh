@@ -187,7 +187,7 @@ else
         $SSH_CMD "${SUDO} bash -c '
             CONF_FILE=\$(grep -rl \"^AllowTcpForwarding\" /etc/ssh/sshd_config.d/ 2>/dev/null | head -1)
             if [[ -n \"\$CONF_FILE\" ]]; then
-                sed -i \"s/^AllowTcpForwarding.*/AllowTcpForwarding local/\" \"\$CONF_FILE\"
+                sed -i \"s/^AllowTcpForwarding.*/#& # original setting\\nAllowTcpForwarding local  # changed by vibe-kanban ide-ssh-setup.sh/\" \"\$CONF_FILE\"
                 echo \"Updated \$CONF_FILE\"
             else
                 echo \"AllowTcpForwarding local\" >> /etc/ssh/sshd_config.d/ide-ssh.conf
