@@ -57,6 +57,89 @@ bash vps.sh ssh "command to run on VPS"
 bash vps.sh scp file1 [file2...] /remote/path/
 ```
 
+### Deploy Logging
+
+During deployment, write a local `deploy-log.md` file that captures every step's commands and output. This gives the user a complete record of what changed on the VPS.
+
+**At deploy start** (before any VPS commands), create `./deploy-log.md` with the Write tool:
+
+```markdown
+# Deploy Log — YYYY-MM-DD HH:MM:SS
+
+**Target:** <SSH_USER>@<VPS_IP>:<SSH_PORT>
+**Install dir:** <INSTALL_DIR>
+**Deploy repo commit:** <output of `git rev-parse --short HEAD`>
+```
+
+**After each step**, append to `deploy-log.md` using the Edit tool. Include:
+- A section heading with the step name
+- The exact command(s) run
+- The full stdout/stderr output in a fenced code block
+
+**At deploy end**, append a summary section:
+
+```markdown
+## Summary
+- **Services:** <each service and its state>
+- **Result:** SUCCESS or FAILED — <reason if failed>
+```
+
+The final log should follow this structure:
+
+````markdown
+# Deploy Log — YYYY-MM-DD HH:MM:SS
+
+**Target:** user@1.2.3.4:22
+**Install dir:** /home/vibe-kanban
+**Deploy repo commit:** abc1234
+
+## Pre-deploy: Cloudflare Access check
+```
+<curl output>
+```
+
+## Step 1: Copy deployment files
+**Commands:**
+```
+<mkdir output>
+<scp output for each file>
+```
+**Files copied to /home/vibe-kanban/:**
+- docker-compose.yml
+- Dockerfile.vps
+- entrypoint.sh
+- .env.example
+- .dockerignore
+- setup.sh
+- .env
+
+## Step 2: Run setup on VPS
+```
+<full setup.sh output>
+```
+
+## Step 3: Post-deploy verification
+
+### Container status
+```
+<docker compose ps output>
+```
+
+### Tunnel status
+```
+<cloudflared logs>
+```
+
+### App logs (if container unhealthy)
+```
+<vibe-kanban logs>
+```
+
+## Summary
+- **Services:** vibe-kanban (running/healthy), cloudflared (running)
+- **Result:** SUCCESS
+````
+
 ### Step 1: Copy deployment files to the VPS
 
 The vibe-kanban source is **not** copied from the local machine — `setup.sh` clones it directly from GitHub on the VPS.
