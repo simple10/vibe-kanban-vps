@@ -11,7 +11,8 @@
       "Bash(scp:*)",
       "Bash(test:*)",
       "Bash(bash:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "WebFetch(domain:www.vibekanban.com)"
     ]
   }
 }

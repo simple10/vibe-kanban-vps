@@ -161,6 +161,39 @@ bash github-login.sh
 
 This SSHs into the container and runs `gh auth login`. You'll get a URL and a one-time code to authorize in your browser. After login, it also auto-configures `git user.name` and `git user.email` inside the container from your GitHub profile and adds a generated ssh key to your Github account. Credentials are persisted in a Docker volume.
 
+### 8. (Optional) IDE Remote SSH (VS Code / Cursor)
+
+You can connect VS Code or Cursor directly into the vibe-kanban container via SSH. This lets "Open in Cursor/VS Code" links from the web UI open the correct container-internal paths (e.g., `/repos/`, worktree directories).
+
+1. Enable IDE SSH in `.env`:
+
+```bash
+VK_IDE_SSH=true
+# VK_SSH_PORT=2222   # default port, change if needed
+```
+
+2. Redeploy to start sshd inside the container:
+
+```bash
+claude "deploy"
+# or: bash vps.sh ssh "cd /home/vibe-kanban && docker compose up -d --build"
+```
+
+3. Run the setup script to inject your SSH key and configure your local SSH config:
+
+```bash
+bash ide-ssh-setup.sh
+```
+
+4. Connect:
+
+```bash
+ssh vibe-kanban    # terminal
+# Or in VS Code/Cursor: Cmd+Shift+P → "Remote-SSH: Connect to Host" → vibe-kanban
+```
+
+> **Firewall warning:** Port 2222 (or your custom `VK_SSH_PORT`) must be open in your VPS firewall. The SSH server uses key-only authentication (no passwords), but you should still restrict access via firewall rules or security groups.
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -174,6 +207,8 @@ This SSHs into the container and runs `gh auth login`. You'll get a URL and a on
 | `SSH_KEY_PATH` | Yes | Path to SSH private key (default: `~/.ssh/vps1_vibekanban_ed25519`) |
 | `SSH_USER` | No | SSH username (default: `root`) |
 | `SSH_PORT` | No | SSH port (default: `22`) |
+| `VK_IDE_SSH` | No | Enable sshd inside the container for IDE access (default: `false`) |
+| `VK_SSH_PORT` | No | Host port for IDE SSH (default: `2222`) |
 | `RUST_LOG` | No | Log level (default: `info`) |
 | `GIT_AUTHOR_NAME` | No | Git commit author name |
 | `GIT_AUTHOR_EMAIL` | No | Git commit author email |
@@ -237,6 +272,7 @@ docker compose start vibe-kanban
 | `github-login.sh` | Helper to run GitHub CLI OAuth login inside the container |
 | `ssh-vps.sh` | SSH into the VPS host |
 | `ssh-vibekanban.sh` | SSH into the VPS and exec into the vibe-kanban container |
+| `ide-ssh-setup.sh` | Setup IDE SSH access (injects key, configures local SSH config) |
 | `CLAUDE.md` | Instructions for Claude Code to deploy and operate the stack |
 
 ## Troubleshooting

@@ -6,6 +6,8 @@ services:
     runtime: sysbox-runc
     container_name: vibe-kanban
     restart: unless-stopped
+    ports:
+      - "${VK_SSH_PORT:-2222}:2222"
     volumes:
       - ./data/vk-data:/home/vkuser/.local/share/vibe-kanban  # SQLite DB + config
       - ./data/vk-repos:/repos                                 # Cloned repositories
@@ -14,12 +16,14 @@ services:
       - ./data/vk-claude:/home/vkuser/.claude                   # Claude Code OAuth credentials
       - ./data/vk-ghcli:/home/vkuser/.config/gh                 # GitHub CLI OAuth credentials
       - ./data/vk-ssh:/home/vkuser/.ssh                         # SSH keys for git push
+      - ./data/vk-sshd:/etc/ssh/sshd_host_keys                    # sshd host keys (IDE SSH)
     env_file:
       - .env
     environment:
       HOST: "0.0.0.0" # Expose vibe-kanban to the cloudflared tunnel - does not expose to internet
       PORT: "3000"
       HOME: /home/vkuser
+      VK_IDE_SSH: "${VK_IDE_SSH:-false}"
     memswap_limit: "${VK_MEM_LIMIT:-8g}"
     deploy:
       resources:

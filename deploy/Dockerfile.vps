@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     tini \
     openssh-client \
+    openssh-server \
     gnupg \
     lsb-release \
     gosu \
@@ -61,6 +62,19 @@ RUN mkdir -p /repos \
     /home/vkuser/.config/gh && \
     chown -R vkuser:vkuser /repos /var/tmp/vibe-kanban /home/vkuser
 
+# Configure sshd for IDE remote access (opt-in via VK_IDE_SSH=true)
+RUN mkdir -p /run/sshd /etc/ssh/sshd_host_keys && \
+    printf '%s\n' \
+    'Port 2222' \
+    'HostKey /etc/ssh/sshd_host_keys/ssh_host_ed25519_key' \
+    'HostKey /etc/ssh/sshd_host_keys/ssh_host_rsa_key' \
+    'PasswordAuthentication no' \
+    'KbdInteractiveAuthentication no' \
+    'AllowUsers vkuser' \
+    'AllowTcpForwarding yes' \
+    'Subsystem sftp /usr/lib/openssh/sftp-server' \
+    > /etc/ssh/sshd_config.d/vk-ide.conf
+
 # Copy entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
@@ -69,6 +83,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 ENV HOST=0.0.0.0
 ENV PORT=3000
 EXPOSE 3000
+EXPOSE 2222
 
 WORKDIR /repos
 

@@ -5,6 +5,7 @@
 ```
 Internet → Cloudflare Edge → cloudflared tunnel → vibe-kanban container (sysbox-runc)
                                                         ├── server binary (port 3000)
+                                                        ├── sshd (port 2222, optional)
                                                         ├── dockerd (overlay2)
                                                         └── agents via npx (Claude Code, etc.)
 ```
@@ -264,6 +265,8 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 | `VK_MEM_LIMIT` | No | Max memory for vibe-kanban container (default: `8g`) |
 | `VK_CPU_RESERVE` | No | Guaranteed CPU cores for vibe-kanban container (default: `1`) |
 | `VK_MEM_RESERVE` | No | Guaranteed memory for vibe-kanban container (default: `2g`) |
+| `VK_IDE_SSH` | No | Enable sshd inside the container for IDE access (default: `false`) |
+| `VK_SSH_PORT` | No | Host port for IDE SSH (default: `2222`) |
 | `RUST_LOG` | No | Log level (default: `info`) |
 | `GIT_AUTHOR_NAME` | No | Git commit author name |
 | `GIT_AUTHOR_EMAIL` | No | Git commit author email |
@@ -271,6 +274,16 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 *At least one agent API key is required, or use Claude Code OAuth login via `claude-login.sh`.
 
 GitHub integration uses `gh` CLI (not a token). Run `bash github-login.sh` after deploying to authenticate. This also auto-configures `git user.name` and `git user.email` inside the container from the GitHub profile.
+
+## IDE Remote SSH Setup (Optional)
+
+After deploying, if the user wants to connect VS Code / Cursor directly into the container (so "Open in Cursor/VS Code" links resolve correct container paths), guide them through IDE SSH setup:
+
+1. The user must set `VK_IDE_SSH=true` in `.env` and redeploy
+2. Run `bash ide-ssh-setup.sh` — this injects their SSH public key and adds a `Host vibe-kanban` entry to `~/.ssh/config`
+3. Port `VK_SSH_PORT` (default 2222) must be open in the VPS firewall
+
+After setup, `ssh vibe-kanban` connects directly into the container as `vkuser`.
 
 ## Operations
 
@@ -340,6 +353,7 @@ All persistent data is stored in bind mounts under `$INSTALL_DIR/data/` on the V
 | `/home/vkuser/.claude/` | `data/vk-claude/` | Claude Code OAuth credentials |
 | `/home/vkuser/.config/gh/` | `data/vk-ghcli/` | GitHub CLI OAuth credentials |
 | `/home/vkuser/.ssh/` | `data/vk-ssh/` | SSH keys for git push to GitHub |
+| `/etc/ssh/sshd_host_keys/` | `data/vk-sshd/` | sshd host keys (IDE SSH) |
 
 ## Troubleshooting
 
@@ -370,6 +384,27 @@ docker compose logs cloudflared
 #   - vibe-kanban not healthy yet → cloudflared waits for healthcheck to pass
 ```
 
+### IDE SSH not connecting
+
+```bash
+# Verify sshd is running inside the container
+docker compose exec vibe-kanban pgrep -a sshd
+# Check VK_IDE_SSH is set
+docker compose exec vibe-kanban printenv VK_IDE_SSH
+# Test port connectivity from local machine
+ssh -p 2222 -i ~/.ssh/your_key vkuser@<VPS_IP> echo "SSH works"
+# Check authorized_keys
+cat data/vk-ssh/authorized_keys
+# Check host keys exist
+ls -la data/vk-sshd/
+```
+
+Common issues:
+- `VK_IDE_SSH` not set to `true` in `.env` — sshd won't start
+- Port 2222 blocked by VPS firewall — open it in your cloud provider's security group
+- Public key not in `data/vk-ssh/authorized_keys` — re-run `bash ide-ssh-setup.sh`
+- "Host key changed" warning — delete old key with `ssh-keygen -R "[<VPS_IP>]:2222"`
+
 ### "permission denied" errors
 
 - The container runs as root internally (sysbox maps this to unprivileged host user)
@@ -390,5 +425,6 @@ docker compose logs cloudflared
 | `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |
 | `codex-login.sh` | Helper to run OpenAI Codex CLI login inside the container |
 | `github-login.sh` | Helper to run GitHub CLI OAuth login inside the container |
+| `ide-ssh-setup.sh` | Setup IDE SSH access (injects key, configures local SSH config) |
 | `ssh-vps.sh` | SSH into the VPS host |
 | `ssh-vibekanban.sh` | SSH into the VPS and exec into the vibe-kanban container |
