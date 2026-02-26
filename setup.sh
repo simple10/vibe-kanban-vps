@@ -7,7 +7,16 @@ set -euo pipefail
 # Usage: sudo bash setup.sh
 # =============================================================================
 
-DEPLOY_DIR="/home/vibe-kanban"
+# Source .env if present (for INSTALL_DIR and other config)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${SCRIPT_DIR}/.env"
+    set +a
+fi
+
+DEPLOY_DIR="${INSTALL_DIR:-/home/vibe-kanban}"
 SYSBOX_VERSION="0.6.6"
 
 # --- Colors ----------------------------------------------------------------

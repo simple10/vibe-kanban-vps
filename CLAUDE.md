@@ -25,7 +25,7 @@ sudo bash setup.sh
 The setup script will:
 1. Install Docker CE
 2. Install Sysbox (secure Docker-in-Docker runtime)
-3. Copy deployment files to `/home/vibe-kanban/`
+3. Copy deployment files to `$INSTALL_DIR` (default: `/home/vibe-kanban`)
 4. Clone vibe-kanban source from GitHub
 5. Prompt you to configure `.env`
 6. Build and start the stack
@@ -61,32 +61,34 @@ bash vps.sh scp file1 [file2...] /remote/path/
 
 The vibe-kanban source is **not** copied from the local machine — `setup.sh` clones it directly from GitHub on the VPS.
 
+Read `INSTALL_DIR` from `.env` (default: `/home/vibe-kanban`) and use it as the remote path:
+
 ```bash
 # Create the deploy directory on the VPS
-bash vps.sh ssh "mkdir -p /home/vibe-kanban && chown \$(whoami): /home/vibe-kanban"
+bash vps.sh ssh "mkdir -p ${INSTALL_DIR} && chown \$(whoami): ${INSTALL_DIR}"
 
 # Copy deployment files
-bash vps.sh scp docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore setup.sh /home/vibe-kanban/
+bash vps.sh scp docker-compose.yml Dockerfile.vps entrypoint.sh .env.example .dockerignore setup.sh ${INSTALL_DIR}/
 
 # Copy .env (contains secrets — only if it exists locally)
-bash vps.sh scp .env /home/vibe-kanban/.env
+bash vps.sh scp .env ${INSTALL_DIR}/.env
 ```
 
 ### Step 2: Run setup on the VPS
 
 For first-time setup (installs Docker + Sysbox, clones vibe-kanban source):
 ```bash
-bash vps.sh ssh "bash /home/vibe-kanban/setup.sh"
+bash vps.sh ssh "bash ${INSTALL_DIR}/setup.sh"
 ```
 
 For subsequent deploys (pulls latest source, rebuilds, and restarts):
 ```bash
-bash vps.sh ssh "bash /home/vibe-kanban/setup.sh"
+bash vps.sh ssh "bash ${INSTALL_DIR}/setup.sh"
 ```
 
 Or to rebuild without pulling source updates:
 ```bash
-bash vps.sh ssh "cd /home/vibe-kanban && docker compose up -d --build"
+bash vps.sh ssh "cd ${INSTALL_DIR} && docker compose up -d --build"
 ```
 
 ### Step 3: Post-deploy verification and report
@@ -96,19 +98,19 @@ After deploying, verify the stack is healthy and present a summary to the user.
 **Check the vibe-kanban container is running:**
 
 ```bash
-bash vps.sh ssh "cd /home/vibe-kanban && docker compose ps --format json"
+bash vps.sh ssh "cd ${INSTALL_DIR} && docker compose ps --format json"
 ```
 
 Parse the output. The `vibe-kanban` service must show `running` status and health `healthy`. If it is not running or unhealthy, fetch logs and show the error to the user:
 
 ```bash
-bash vps.sh ssh "cd /home/vibe-kanban && docker compose logs --tail=40 vibe-kanban"
+bash vps.sh ssh "cd ${INSTALL_DIR} && docker compose logs --tail=40 vibe-kanban"
 ```
 
 **Check the cloudflared tunnel:**
 
 ```bash
-bash vps.sh ssh "cd /home/vibe-kanban && docker compose logs --tail=20 cloudflared"
+bash vps.sh ssh "cd ${INSTALL_DIR} && docker compose logs --tail=20 cloudflared"
 ```
 
 Look for `"Connection registered"` in the output. If absent, warn the user the tunnel may not be connected yet.
@@ -116,7 +118,7 @@ Look for `"Connection registered"` in the output. If absent, warn the user the t
 **Present a deploy report to the user** with this information:
 
 1. **Services status** — list each service and its state (running/healthy, starting, exited, etc.)
-2. **Files modified on VPS** — list the deployment files that were copied to `/home/vibe-kanban/` and whether vibe-kanban source was cloned/updated
+2. **Files modified on VPS** — list the deployment files that were copied to `$INSTALL_DIR` and whether vibe-kanban source was cloned/updated
 3. **How to access vibe-kanban:**
    - If `VK_DOMAIN` is set in `.env`: `https://<VK_DOMAIN>`
    - If `VK_DOMAIN` is not set: tell the user to find their tunnel's public hostname in the Cloudflare Zero Trust dashboard under Networks → Tunnels → their tunnel → Public Hostname
@@ -149,6 +151,7 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 | `SSH_KEY_PATH` | Yes | Path to SSH private key for VPS (default: `~/.ssh/vps1_vibekanban_ed25519`) |
 | `SSH_USER` | No | SSH username (default: `root`) |
 | `SSH_PORT` | No | SSH port (default: `22`) |
+| `INSTALL_DIR` | No | Install directory on VPS (default: `/home/vibe-kanban`) |
 | `RUST_LOG` | No | Log level (default: `info`) |
 | `GIT_AUTHOR_NAME` | No | Git commit author name |
 | `GIT_AUTHOR_EMAIL` | No | Git commit author email |
@@ -163,7 +166,7 @@ All operations commands below are run on the VPS. If connected as a non-root use
 
 ### Logs
 ```bash
-cd /home/vibe-kanban
+cd ${INSTALL_DIR}
 docker compose logs -f              # all services
 docker compose logs -f vibe-kanban   # app only
 docker compose logs -f cloudflared   # tunnel only
@@ -171,13 +174,13 @@ docker compose logs -f cloudflared   # tunnel only
 
 ### Restart
 ```bash
-cd /home/vibe-kanban
+cd ${INSTALL_DIR}
 docker compose restart
 ```
 
 ### Update
 ```bash
-cd /home/vibe-kanban
+cd ${INSTALL_DIR}
 docker compose up -d --build         # rebuilds image with latest npm package
 ```
 

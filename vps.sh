@@ -25,6 +25,7 @@ fi
 : "${SSH_KEY_PATH:?SSH_KEY_PATH is required in .env}"
 SSH_USER="${SSH_USER:-root}"
 SSH_PORT="${SSH_PORT:-22}"
+INSTALL_DIR="${INSTALL_DIR:-/home/vibe-kanban}"
 
 case "${1:-}" in
     ssh)
