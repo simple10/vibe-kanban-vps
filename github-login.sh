@@ -6,7 +6,7 @@ set -euo pipefail
 # SSHs into the VPS, docker execs into the vibe-kanban container, runs
 # gh auth login (with SSH key generation), then configures git identity.
 #
-# Usage: bash gh-login.sh
+# Usage: bash github-login.sh
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

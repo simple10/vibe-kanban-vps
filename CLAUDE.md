@@ -23,6 +23,7 @@ sudo bash setup.sh
 ```
 
 The setup script will:
+
 1. Install Docker CE
 2. Install Sysbox (secure Docker-in-Docker runtime)
 3. Copy deployment files to `$INSTALL_DIR` (default: `/home/vibe-kanban`)
@@ -43,9 +44,11 @@ If `CF_TUNNEL_TOKEN` is missing, prompt with:
 > You need a Cloudflare Tunnel token. Create one at: Cloudflare Zero Trust dashboard → Networks → Tunnels → Create. Copy the token and set `CF_TUNNEL_TOKEN` in `.env`.
 
 If no `ANTHROPIC_API_KEY` is set, ask the user if they want to use Claude Code OAuth login instead. If yes, after deploying, run:
+
 ```bash
 bash claude-login.sh
 ```
+
 This SSHs into the VPS, docker execs into the vibe-kanban container, and runs the Claude Code login flow. The user will see a URL to open in their browser. Credentials are persisted in the `vk-claude` volume.
 
 ## Deploying to the VPS
@@ -72,6 +75,7 @@ During deployment, write a local `deploy-log.md` file that captures every step's
 ```
 
 **After each step**, append to `deploy-log.md` using the Edit tool. Include:
+
 - A section heading with the step name
 - The exact command(s) run
 - The full stdout/stderr output in a fenced code block
@@ -164,16 +168,19 @@ bash vps.sh scp .env ${INSTALL_DIR}/.env
 ### Step 2: Run setup on the VPS
 
 For first-time setup (installs Docker + Sysbox, clones vibe-kanban source):
+
 ```bash
 bash vps.sh ssh "bash ${INSTALL_DIR}/setup.sh"
 ```
 
 For subsequent deploys (pulls latest source, rebuilds, and restarts):
+
 ```bash
 bash vps.sh ssh "bash ${INSTALL_DIR}/setup.sh"
 ```
 
 Or to rebuild without pulling source updates:
+
 ```bash
 bash vps.sh ssh "cd ${INSTALL_DIR} && docker compose up -d --build"
 ```
@@ -249,13 +256,14 @@ curl -sI --connect-timeout 10 https://<VK_DOMAIN>/ 2>&1 | head -10
 
 *At least one agent API key is required, or use Claude Code OAuth login via `claude-login.sh`.
 
-GitHub integration uses `gh` CLI (not a token). Run `bash gh-login.sh` after deploying to authenticate. This also auto-configures `git user.name` and `git user.email` inside the container from the GitHub profile.
+GitHub integration uses `gh` CLI (not a token). Run `bash github-login.sh` after deploying to authenticate. This also auto-configures `git user.name` and `git user.email` inside the container from the GitHub profile.
 
 ## Operations
 
 All operations commands below are run on the VPS. If connected as a non-root user, prefix `docker` commands with `sudo`.
 
 ### Logs
+
 ```bash
 cd ${INSTALL_DIR}
 docker compose logs -f              # all services
@@ -264,18 +272,21 @@ docker compose logs -f cloudflared   # tunnel only
 ```
 
 ### Restart
+
 ```bash
 cd ${INSTALL_DIR}
 docker compose restart
 ```
 
 ### Update
+
 ```bash
 cd ${INSTALL_DIR}
 docker compose up -d --build         # rebuilds image with latest npm package
 ```
 
 ### Backup SQLite DB
+
 ```bash
 # Copy DB from the named volume
 docker compose exec vibe-kanban cp /root/.local/share/vibe-kanban/db.v2.sqlite /tmp/backup.sqlite
@@ -283,6 +294,7 @@ docker compose cp vibe-kanban:/tmp/backup.sqlite ./backup-$(date +%Y%m%d).sqlite
 ```
 
 ### Restore SQLite DB
+
 ```bash
 docker compose cp ./backup.sqlite vibe-kanban:/tmp/restore.sqlite
 docker compose exec vibe-kanban cp /tmp/restore.sqlite /root/.local/share/vibe-kanban/db.v2.sqlite
@@ -290,6 +302,7 @@ docker compose restart vibe-kanban
 ```
 
 ### Verify Docker-in-Docker
+
 ```bash
 docker compose exec vibe-kanban docker info
 docker compose exec vibe-kanban docker run --rm alpine echo "Docker works inside sysbox"
@@ -310,6 +323,7 @@ docker compose exec vibe-kanban docker run --rm alpine echo "Docker works inside
 ## Troubleshooting
 
 ### Container won't start
+
 ```bash
 docker compose logs vibe-kanban
 # Check if sysbox is running:
@@ -317,6 +331,7 @@ systemctl status sysbox
 ```
 
 ### Docker daemon not starting inside container
+
 ```bash
 docker compose exec vibe-kanban cat /var/log/dockerd.log
 # Ensure sysbox-runc runtime is being used:
@@ -324,6 +339,7 @@ docker inspect vibe-kanban | grep Runtime
 ```
 
 ### Tunnel not connecting
+
 ```bash
 docker compose logs cloudflared
 # Look for "Connection registered" — means the tunnel is active
@@ -334,6 +350,7 @@ docker compose logs cloudflared
 ```
 
 ### "permission denied" errors
+
 - The container runs as root internally (sysbox maps this to unprivileged host user)
 - If volume permissions are wrong, try: `docker compose down -v && docker compose up -d`
 
@@ -348,4 +365,4 @@ docker compose logs cloudflared
 | `setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
 | `vps.sh` | SSH/SCP wrapper — reads `.env`, auto-adds sudo for non-root |
 | `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |
-| `gh-login.sh` | Helper to run GitHub CLI OAuth login inside the container |
+| `github-login.sh` | Helper to run GitHub CLI OAuth login inside the container |

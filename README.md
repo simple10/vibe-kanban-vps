@@ -85,7 +85,7 @@ Use the helper scripts to authenticate Github and Claude Code.
 # Log vibe-kanban into your github account
 # This step is required for vibe-kanban to git commit and push/pull code
 # Auto generates a ssh key (if needed) for vibe-kanban and adds it to your github account
-./gh-login.sh
+./github-login.sh
 
 # Log claude code into anthropic subscription (optional)
 ./claude-login.sh
@@ -162,7 +162,7 @@ This SSHs into the VPS, opens a shell inside the vibe-kanban container, and runs
 vibe-kanban uses the GitHub CLI (`gh`) for PR creation — not a `GITHUB_TOKEN`. After deploying, run:
 
 ```bash
-bash gh-login.sh
+bash github-login.sh
 ```
 
 This SSHs into the container and runs `gh auth login`. You'll get a URL and a one-time code to authorize in your browser. After login, it also auto-configures `git user.name` and `git user.email` inside the container from your GitHub profile and adds a generated ssh key to your Github account. Credentials are persisted in a Docker volume.
@@ -186,7 +186,7 @@ This SSHs into the container and runs `gh auth login`. You'll get a URL and a on
 
 *At least one agent API key is required, or use Claude Code OAuth login via `claude-login.sh`.
 
-GitHub integration uses `gh` CLI auth — run `bash gh-login.sh` after deploying (see step 7).
+GitHub integration uses `gh` CLI auth — run `bash github-login.sh` after deploying (see step 7).
 
 ## Operations
 
@@ -235,7 +235,7 @@ docker compose restart vibe-kanban
 | `.env.example` | Environment variable template |
 | `setup.sh` | VPS bootstrap (Docker + Sysbox + deploy) |
 | `claude-login.sh` | Helper to run Claude Code OAuth login inside the container |
-| `gh-login.sh` | Helper to run GitHub CLI OAuth login inside the container |
+| `github-login.sh` | Helper to run GitHub CLI OAuth login inside the container |
 | `CLAUDE.md` | Instructions for Claude Code to deploy and operate the stack |
 
 ## Troubleshooting
