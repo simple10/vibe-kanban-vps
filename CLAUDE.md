@@ -169,9 +169,17 @@ The final log should follow this structure:
 <ide-ssh-setup.sh output, or "Skipped — VK_IDE_SSH not enabled" / "Skipped — user declined">
 ```
 
+### VPS host changes (outside container)
+> **IMPORTANT:** List every change made to the VPS host itself (not the container).
+> If no host changes were made, write "None".
+
+- <e.g., Changed AllowTcpForwarding from 'no' to 'local' in /etc/ssh/sshd_config.d/hardening.conf>
+- <e.g., Restarted VPS sshd (systemctl restart sshd)>
+
 ## Summary
 - **Services:** vibe-kanban (running/healthy), cloudflared (running)
 - **IDE SSH:** configured / skipped
+- **VPS host changes:** <list changes or "None">
 - **Result:** SUCCESS
 ````
 
@@ -263,13 +271,19 @@ If the user says yes, run:
 bash ide-ssh-setup.sh
 ```
 
-This injects the user's SSH public key into the container and adds a `Host vibe-kanban` entry to `~/.ssh/config`. After setup, `ssh vibe-kanban` connects directly into the container as `vkuser`.
-
-If the script succeeds, include the setup result in the deploy log and inform the user they can now connect with `ssh vibe-kanban` or via their IDE's Remote-SSH extension (Cmd+Shift+P → "Remote-SSH: Connect to Host" → select "vibe-kanban").
+The script is interactive — it will prompt the user if VPS host changes are needed (e.g., changing `AllowTcpForwarding` in sshd config). Let the script handle the prompts directly.
 
 If `VK_IDE_SSH` is not set or is `false`, skip this step silently.
 
-**Note:** Port 2222 is bound to `127.0.0.1` on the VPS (Docker daemon is configured with `"ip": "127.0.0.1"`), so it is not publicly accessible. IDE SSH connectivity depends on how `ide-ssh-setup.sh` configures the SSH client (direct or via ProxyJump).
+**After the script completes**, capture its output in the deploy log. Pay special attention to the "Summary of Changes" section the script prints. In the deploy log, you **must** separately list any VPS host changes (changes outside the container) under a `### VPS host changes (outside container)` heading. This includes:
+
+- sshd config changes (e.g., `AllowTcpForwarding`)
+- sshd restarts
+- Any other modifications to VPS host files or services
+
+If the script made no VPS host changes, write "None" under that heading. The deploy log summary must also include a **VPS host changes** line.
+
+**Note:** Port 2222 is bound to `127.0.0.1` on the VPS (Docker daemon is configured with `"ip": "127.0.0.1"`), so it is not publicly accessible. The script configures SSH ProxyJump through the VPS to reach port 2222 locally.
 
 ## Environment Variables
 
@@ -413,9 +427,11 @@ ls -la data/vk-sshd/
 
 Common issues:
 - `VK_IDE_SSH` not set to `true` in `.env` — sshd won't start
-- Port 2222 is bound to `127.0.0.1` on the VPS (not publicly accessible) — IDE SSH requires proxying through VPS SSH or a tunnel
+- Port 2222 is bound to `127.0.0.1` on the VPS (not publicly accessible) — IDE SSH uses `ProxyJump` through VPS SSH
+- `AllowTcpForwarding` must be set to `local` (not `no`) in VPS sshd config (`/etc/ssh/sshd_config.d/hardening.conf`) for ProxyJump to work
+- `authorized_keys` owned by `root` instead of `vkuser` inside the container — re-run `bash ide-ssh-setup.sh` (it fixes ownership via `docker exec`)
 - Public key not in `data/vk-ssh/authorized_keys` — re-run `bash ide-ssh-setup.sh`
-- "Host key changed" warning — delete old key with `ssh-keygen -R "[<VPS_IP>]:2222"`
+- "Host key changed" warning — delete old key with `ssh-keygen -R "[127.0.0.1]:2222"`
 
 ### "permission denied" errors
 

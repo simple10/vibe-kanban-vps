@@ -60,10 +60,16 @@ fi
 SSH_CMD="ssh -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ${SSH_USER}@${VPS_IP}"
 
 # --- Colors ------------------------------------------------------------------
+RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
+
+# Track changes for the summary
+CHANGES_LOCAL=()
+CHANGES_VPS_HOST=()
+CHANGES_CONTAINER=()
 
 # --- Derive public key -------------------------------------------------------
 if [[ -z "$PUB_KEY_PATH" ]]; then
@@ -88,19 +94,78 @@ AUTH_KEYS_DIR="${INSTALL_DIR}/data/vk-ssh"
 AUTH_KEYS_FILE="${AUTH_KEYS_DIR}/authorized_keys"
 
 # Create authorized_keys if missing, append key if not already present
-$SSH_CMD "${SUDO} bash -c '
+KEY_RESULT=$($SSH_CMD "${SUDO} bash -c '
     mkdir -p ${AUTH_KEYS_DIR}
     touch ${AUTH_KEYS_FILE}
     chmod 600 ${AUTH_KEYS_FILE}
     if grep -qF \"${PUB_KEY}\" ${AUTH_KEYS_FILE} 2>/dev/null; then
-        echo \"Key already present in authorized_keys\"
+        echo \"already_present\"
     else
         echo \"${PUB_KEY}\" >> ${AUTH_KEYS_FILE}
-        echo \"Key added to authorized_keys\"
+        echo \"added\"
     fi
-'"
+'")
 
-echo -e "${GREEN}SSH key injected successfully.${NC}"
+# Fix ownership inside the container — sysbox remaps UIDs so host chown won't match.
+# docker exec sees the container's UID namespace where vkuser is the correct owner.
+$SSH_CMD "${SUDO} docker exec vibe-kanban chown vkuser:vkuser /home/vkuser/.ssh/authorized_keys"
+
+if [[ "$KEY_RESULT" == "added" ]]; then
+    echo -e "${GREEN}SSH key added to authorized_keys.${NC}"
+    CHANGES_CONTAINER+=("Added SSH public key to container authorized_keys")
+else
+    echo -e "${GREEN}SSH key already present in authorized_keys.${NC}"
+fi
+
+# --- Ensure VPS sshd allows local TCP forwarding (required for ProxyJump) ----
+echo -e "${YELLOW}Checking VPS sshd AllowTcpForwarding setting...${NC}"
+
+TCP_FWD=$($SSH_CMD "${SUDO} bash -c '
+    # Check all sshd config files for the effective AllowTcpForwarding value
+    val=\$(${SUDO} sshd -T 2>/dev/null | grep -i \"^allowtcpforwarding \" | awk \"{print \\\$2}\")
+    echo \"\${val:-unknown}\"
+'")
+
+if [[ "$TCP_FWD" == "yes" || "$TCP_FWD" == "local" ]]; then
+    echo -e "${GREEN}AllowTcpForwarding is '${TCP_FWD}' — ProxyJump will work.${NC}"
+else
+    echo ""
+    echo -e "${RED}╔══════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║  VPS HOST CHANGE REQUIRED                                      ║${NC}"
+    echo -e "${RED}╚══════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "  The VPS sshd has ${YELLOW}AllowTcpForwarding ${TCP_FWD}${NC}"
+    echo -e "  ProxyJump requires ${GREEN}AllowTcpForwarding local${NC}"
+    echo ""
+    echo -e "  This changes the VPS SSH daemon config (outside the container)."
+    echo -e "  'local' only permits forwarding to 127.0.0.1 — no remote forwarding."
+    echo ""
+    echo -e "  ${CYAN}File: /etc/ssh/sshd_config.d/hardening.conf${NC}"
+    echo -e "  ${CYAN}Change: AllowTcpForwarding ${TCP_FWD} → AllowTcpForwarding local${NC}"
+    echo ""
+    read -r -p "  Apply this change and restart sshd? [y/N] " REPLY
+    echo ""
+
+    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+        # Find which config file sets AllowTcpForwarding and update it
+        $SSH_CMD "${SUDO} bash -c '
+            CONF_FILE=\$(grep -rl \"^AllowTcpForwarding\" /etc/ssh/sshd_config.d/ 2>/dev/null | head -1)
+            if [[ -n \"\$CONF_FILE\" ]]; then
+                sed -i \"s/^AllowTcpForwarding.*/AllowTcpForwarding local/\" \"\$CONF_FILE\"
+                echo \"Updated \$CONF_FILE\"
+            else
+                echo \"AllowTcpForwarding local\" >> /etc/ssh/sshd_config.d/ide-ssh.conf
+                echo \"Created /etc/ssh/sshd_config.d/ide-ssh.conf\"
+            fi
+        '"
+        $SSH_CMD "${SUDO} systemctl restart sshd"
+        echo -e "${GREEN}VPS sshd updated and restarted.${NC}"
+        CHANGES_VPS_HOST+=("Changed AllowTcpForwarding from '${TCP_FWD}' to 'local' in VPS sshd config")
+        CHANGES_VPS_HOST+=("Restarted VPS sshd (systemctl restart sshd)")
+    else
+        echo -e "${YELLOW}Skipped. IDE SSH via ProxyJump will NOT work until AllowTcpForwarding is set to 'local'.${NC}"
+    fi
+fi
 
 # --- Add Host entry to local ~/.ssh/config -----------------------------------
 if [[ "$SKIP_CONFIG" == "true" ]]; then
@@ -110,27 +175,80 @@ else
     mkdir -p "$HOME/.ssh"
     touch "$SSH_CONFIG"
 
-    if grep -q "^Host vibe-kanban$" "$SSH_CONFIG" 2>/dev/null; then
-        echo -e "${YELLOW}Host 'vibe-kanban' already exists in ${SSH_CONFIG} — skipping.${NC}"
-        echo "  To update it, edit ${SSH_CONFIG} manually or remove the existing entry and re-run."
-    else
-        EXPANDED_KEY_PATH="${SSH_KEY_PATH/#\~/$HOME}"
-        cat >> "$SSH_CONFIG" <<EOF
+    # Remove stale entries if present so we always write the correct config
+    for host_entry in "vibe-kanban-vps" "vibe-kanban"; do
+        if grep -q "^Host ${host_entry}$" "$SSH_CONFIG" 2>/dev/null; then
+            echo -e "${YELLOW}Removing existing '${host_entry}' entry from ${SSH_CONFIG}...${NC}"
+            # Delete from "Host <entry>" to the next "Host " line (or EOF)
+            sed -i.bak "/^Host ${host_entry}$/,/^Host /{/^Host ${host_entry}$/d;/^Host /!d;}" "$SSH_CONFIG"
+        fi
+    done
+    # Clean up trailing blank lines
+    sed -i.bak -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$SSH_CONFIG"
+    rm -f "${SSH_CONFIG}.bak"
+
+    EXPANDED_KEY_PATH="${SSH_KEY_PATH/#\~/$HOME}"
+
+    # Port 2222 is bound to 127.0.0.1 on the VPS (not publicly accessible).
+    # We ProxyJump through the VPS SSH connection to reach the container sshd.
+    cat >> "$SSH_CONFIG" <<EOF
+
+Host vibe-kanban-vps
+    HostName ${VPS_IP}
+    Port ${SSH_PORT}
+    User ${SSH_USER}
+    IdentityFile ${EXPANDED_KEY_PATH}
+    StrictHostKeyChecking accept-new
 
 Host vibe-kanban
-    HostName ${VPS_IP}
+    HostName 127.0.0.1
     Port ${VK_SSH_PORT}
     User vkuser
     IdentityFile ${EXPANDED_KEY_PATH}
+    ProxyJump vibe-kanban-vps
     StrictHostKeyChecking accept-new
 EOF
-        echo -e "${GREEN}Added 'vibe-kanban' to ${SSH_CONFIG}${NC}"
-    fi
+    echo -e "${GREEN}Added 'vibe-kanban-vps' and 'vibe-kanban' to ${SSH_CONFIG}${NC}"
+    CHANGES_LOCAL+=("Updated ~/.ssh/config — added Host entries 'vibe-kanban-vps' and 'vibe-kanban'")
 fi
 
-# --- Print instructions ------------------------------------------------------
+# --- Print change summary ----------------------------------------------------
 echo ""
-echo -e "${CYAN}=== IDE SSH Setup Complete ===${NC}"
+echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║  IDE SSH Setup — Summary of Changes                            ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}"
+
+if [[ ${#CHANGES_VPS_HOST[@]} -gt 0 ]]; then
+    echo ""
+    echo -e "  ${RED}VPS Host (outside container):${NC}"
+    for change in "${CHANGES_VPS_HOST[@]}"; do
+        echo -e "    • $change"
+    done
+fi
+
+if [[ ${#CHANGES_CONTAINER[@]} -gt 0 ]]; then
+    echo ""
+    echo -e "  ${YELLOW}Container (vibe-kanban):${NC}"
+    for change in "${CHANGES_CONTAINER[@]}"; do
+        echo -e "    • $change"
+    done
+fi
+
+if [[ ${#CHANGES_LOCAL[@]} -gt 0 ]]; then
+    echo ""
+    echo -e "  ${GREEN}Local machine:${NC}"
+    for change in "${CHANGES_LOCAL[@]}"; do
+        echo -e "    • $change"
+    done
+fi
+
+if [[ ${#CHANGES_VPS_HOST[@]} -eq 0 && ${#CHANGES_CONTAINER[@]} -eq 0 && ${#CHANGES_LOCAL[@]} -eq 0 ]]; then
+    echo ""
+    echo -e "  ${GREEN}No changes made (everything was already configured).${NC}"
+fi
+
+echo ""
+echo -e "${CYAN}───────────────────────────────────────────────────────────────────${NC}"
 echo ""
 echo "  Connect via terminal:"
 echo "    ssh vibe-kanban"
@@ -140,8 +258,5 @@ echo "    1. Install the Remote-SSH extension"
 echo "    2. Cmd+Shift+P → 'Remote-SSH: Connect to Host' → select 'vibe-kanban'"
 echo "    3. Open folders like /repos/ or /var/tmp/vibe-kanban/worktrees/"
 echo ""
-echo "  vibe-kanban UI (Remote SSH Host setting):"
-echo "    Set Host to 'vibe-kanban' and User to 'vkuser'"
-echo ""
 echo -e "${YELLOW}NOTE: Ensure VK_IDE_SSH=true is set in .env and the container has been"
-echo -e "redeployed. Also ensure port ${VK_SSH_PORT} is open in your VPS firewall.${NC}"
+echo -e "redeployed. Port ${VK_SSH_PORT} is only accessible via ProxyJump through the VPS.${NC}"
