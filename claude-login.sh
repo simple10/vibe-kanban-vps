@@ -37,7 +37,8 @@ SSH_CMD="ssh -t -i ${SSH_KEY_PATH} -p ${SSH_PORT} -o StrictHostKeyChecking=accep
 
 # --- Run Claude Code login inside the container -----------------------------
 echo "Connecting to ${VPS_IP} and running Claude Code login inside the vibe-kanban container..."
+printf "\n\033[32mUse "/login" command with claude to update credentials.\033[0m\n"
 echo "A URL will be displayed — open it in your browser to complete the login."
 echo ""
 
-$SSH_CMD "${SUDO} docker exec -it -u vkuser -e HOME=/home/vkuser vibe-kanban npx -y @anthropic-ai/claude-code@latest /login"
+$SSH_CMD "${SUDO} docker exec -it -u vkuser -e HOME=/home/vkuser vibe-kanban npx -y @anthropic-ai/claude-code@latest"
