@@ -18,23 +18,36 @@ if command -v dockerd &>/dev/null; then
     fi
 fi
 
-# Ensure data directories exist and are owned by vkuser
+# Ensure essential directories exist in the home volume (empty on first start)
 mkdir -p /home/vkuser/.local/share/vibe-kanban
 mkdir -p /home/vkuser/.ssh
+mkdir -p /home/vkuser/.claude
+mkdir -p /home/vkuser/.config/gh
 mkdir -p /var/tmp/vibe-kanban/worktrees
 mkdir -p /repos
-chown -R vkuser:vkuser /repos /var/tmp/vibe-kanban /home/vkuser
 
-# Persist .gitconfig via symlink into the data volume
-GITCONFIG_PERSIST="/home/vkuser/.local/share/vibe-kanban/.gitconfig"
+# Seed shell config from skeleton on first start (volume is empty)
+for f in .bashrc .profile .bash_logout; do
+    if [[ ! -f "/home/vkuser/$f" ]] && [[ -f "/etc/skel/$f" ]]; then
+        cp "/etc/skel/$f" "/home/vkuser/$f"
+    fi
+done
+
+# Migrate legacy gitconfig symlink: with the whole-home bind mount,
+# .gitconfig persists naturally — no symlink needed.
 GITCONFIG_HOME="/home/vkuser/.gitconfig"
-if [[ -f "$GITCONFIG_PERSIST" && ! -L "$GITCONFIG_HOME" ]]; then
-    ln -sf "$GITCONFIG_PERSIST" "$GITCONFIG_HOME"
-elif [[ ! -f "$GITCONFIG_PERSIST" ]]; then
-    touch "$GITCONFIG_PERSIST"
-    chown vkuser:vkuser "$GITCONFIG_PERSIST"
-    ln -sf "$GITCONFIG_PERSIST" "$GITCONFIG_HOME"
+GITCONFIG_LEGACY="/home/vkuser/.local/share/vibe-kanban/.gitconfig"
+if [[ -L "$GITCONFIG_HOME" ]]; then
+    # Replace symlink with the actual file content
+    if [[ -f "$GITCONFIG_LEGACY" ]]; then
+        rm "$GITCONFIG_HOME"
+        cp "$GITCONFIG_LEGACY" "$GITCONFIG_HOME"
+    else
+        rm "$GITCONFIG_HOME"
+    fi
 fi
+
+chown -R vkuser:vkuser /repos /var/tmp/vibe-kanban /home/vkuser
 
 # Ensure correct SSH permissions (volume may reset them)
 chmod 700 /home/vkuser/.ssh

@@ -141,7 +141,7 @@ deploy_stack() {
 
 start_stack() {
     info "Creating bind mount directories..."
-    mkdir -p "$DEPLOY_DIR"/data/{vibe-kanban,repos,worktrees,docker,claude,ghcli,ssh,sshd}
+    mkdir -p "$DEPLOY_DIR"/data/{home,repos,worktrees,docker,sshd}
 
     info "Building and starting vibe-kanban stack..."
     cd "$DEPLOY_DIR"

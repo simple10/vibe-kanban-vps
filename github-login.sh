@@ -45,7 +45,7 @@ NC='\033[0m'
 echo -e "${YELLOW}Connecting to ${VPS_IP} and running GitHub CLI login inside the vibe-kanban container...${NC}"
 echo ""
 echo "This script creates a new ssh-key (if needed) securely in the vibe-kanban container."
-echo "It adds the key to your github account. The key is persisted in the data/ssh/ bind mount."
+echo "It adds the key to your github account. The key is persisted in the data/home/.ssh/ bind mount."
 echo ""
 echo -e "${CYAN}IMPORTANT: When prompted for a passphrase, leave it EMPTY (just press Enter).${NC}"
 echo -e "${CYAN}           Agents cannot enter passphrases interactively.${NC}"

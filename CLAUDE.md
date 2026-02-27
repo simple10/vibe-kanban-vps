@@ -50,7 +50,7 @@ If no `ANTHROPIC_API_KEY` is set, ask the user if they want to use Claude Code O
 bash claude-login.sh
 ```
 
-This SSHs into the VPS, docker execs into the vibe-kanban container, and runs the Claude Code login flow. The user will see a URL to open in their browser. Credentials are persisted in `data/claude/`.
+This SSHs into the VPS, docker execs into the vibe-kanban container, and runs the Claude Code login flow. The user will see a URL to open in their browser. Credentials are persisted in `data/home/.claude/`.
 
 ### Cloudflare Access Verification
 
@@ -351,15 +351,15 @@ docker compose up -d --build         # rebuilds image with latest npm package
 Stream the DB file from the VPS bind mount to your local machine:
 
 ```bash
-bash vps.sh ssh "cat ${INSTALL_DIR}/data/vibe-kanban/db.v2.sqlite" > backup-$(date +%Y%m%d).sqlite
+bash vps.sh ssh "cat ${INSTALL_DIR}/data/home/.local/share/vibe-kanban/db.v2.sqlite" > backup-$(date +%Y%m%d).sqlite
 ```
 
 ### Backup all data
 
-All persistent data lives in `$INSTALL_DIR/data/` on the VPS. Tar the entire directory and stream it to your local machine:
+All persistent data lives in `$INSTALL_DIR/data/` on the VPS. Tar the entire directory (excluding caches) and stream it to your local machine:
 
 ```bash
-bash vps.sh ssh "cd ${INSTALL_DIR} && tar czf - data/" > vk-backup-$(date +%Y%m%d).tar.gz
+bash vps.sh ssh "cd ${INSTALL_DIR} && tar --exclude='data/home/.npm' --exclude='data/home/.vibe-kanban/bin' --exclude='data/home/.bun' --exclude='data/home/.cache' -czf - data/" > vk-backup-$(date +%Y%m%d).tar.gz
 ```
 
 ### Restore SQLite DB
@@ -368,7 +368,7 @@ Copy the backup to the VPS, then swap it in:
 
 ```bash
 bash vps.sh scp ./backup.sqlite ${INSTALL_DIR}/backup.sqlite
-bash vps.sh ssh "cd ${INSTALL_DIR} && docker compose stop vibe-kanban && cp backup.sqlite data/vibe-kanban/db.v2.sqlite && docker compose start vibe-kanban && rm backup.sqlite"
+bash vps.sh ssh "cd ${INSTALL_DIR} && docker compose stop vibe-kanban && cp backup.sqlite data/home/.local/share/vibe-kanban/db.v2.sqlite && docker compose start vibe-kanban && rm backup.sqlite"
 ```
 
 ### Verify Docker-in-Docker
@@ -384,14 +384,24 @@ All persistent data is stored in bind mounts under `$INSTALL_DIR/data/` on the V
 
 | Container path | Host bind mount | Purpose |
 |---|---|---|
-| `/home/vkuser/.local/share/vibe-kanban/` | `data/vibe-kanban/` | SQLite DB, config, profiles, credentials |
+| `/home/vkuser/` | `data/home/` | Entire home directory (all dotfiles, config, caches) |
 | `/repos/` | `data/repos/` | Cloned repositories |
 | `/var/tmp/vibe-kanban/` | `data/worktrees/` | Git worktrees for agents |
 | `/var/lib/docker/` | `data/docker/` | Docker-in-Docker storage |
-| `/home/vkuser/.claude/` | `data/claude/` | Claude Code OAuth credentials |
-| `/home/vkuser/.config/gh/` | `data/ghcli/` | GitHub CLI OAuth credentials |
-| `/home/vkuser/.ssh/` | `data/ssh/` | SSH keys for git push to GitHub |
 | `/etc/ssh/sshd_host_keys/` | `data/sshd/` | sshd host keys (IDE SSH) |
+
+Key paths inside `data/home/`:
+
+| Path | Purpose |
+|---|---|
+| `.local/share/vibe-kanban/` | SQLite DB, config, credentials |
+| `.claude/` | Claude Code OAuth credentials + settings |
+| `.claude.json` | Claude Code account metadata |
+| `.config/gh/` | GitHub CLI OAuth credentials |
+| `.ssh/` | SSH keys for git push to GitHub |
+| `.npm/` | npm cache (speeds up agent spawning via npx) |
+| `.vibe-kanban/bin/` | Downloaded vibe-kanban binary cache |
+| `.gitconfig` | Git identity config |
 
 ### VPS host file backups
 
@@ -446,7 +456,7 @@ docker compose exec vibe-kanban pgrep -a sshd
 # Check VK_IDE_SSH is set
 docker compose exec vibe-kanban printenv VK_IDE_SSH
 # Check authorized_keys
-cat data/ssh/authorized_keys
+cat data/home/.ssh/authorized_keys
 # Check host keys exist
 ls -la data/sshd/
 ```
@@ -456,7 +466,7 @@ Common issues:
 - Port 2222 is bound to `127.0.0.1` on the VPS (not publicly accessible) — IDE SSH uses `ProxyJump` through VPS SSH
 - `AllowTcpForwarding` must be set to `local` (not `no`) in VPS sshd config (`/etc/ssh/sshd_config.d/hardening.conf`) for ProxyJump to work
 - `authorized_keys` owned by `root` instead of `vkuser` inside the container — re-run `bash ide-ssh-setup.sh` (it fixes ownership via `docker exec`)
-- Public key not in `data/ssh/authorized_keys` — re-run `bash ide-ssh-setup.sh`
+- Public key not in `data/home/.ssh/authorized_keys` — re-run `bash ide-ssh-setup.sh`
 - "Host key changed" warning — delete old key with `ssh-keygen -R "[127.0.0.1]:2222"`
 
 ### "permission denied" errors

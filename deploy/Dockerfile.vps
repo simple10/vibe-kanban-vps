@@ -55,11 +55,8 @@ RUN groupadd -r vkuser && \
     useradd -r -g vkuser -G docker -m -s /bin/bash vkuser
 
 # Create required directories owned by vkuser
-RUN mkdir -p /repos \
-    /var/tmp/vibe-kanban/worktrees \
-    /home/vkuser/.local/share/vibe-kanban \
-    /home/vkuser/.claude \
-    /home/vkuser/.config/gh && \
+# Home subdirs are created by entrypoint.sh (the bind mount shadows image contents)
+RUN mkdir -p /repos /var/tmp/vibe-kanban/worktrees && \
     chown -R vkuser:vkuser /repos /var/tmp/vibe-kanban /home/vkuser
 
 # Configure sshd for IDE remote access (opt-in via VK_IDE_SSH=true)

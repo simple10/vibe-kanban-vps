@@ -287,14 +287,14 @@ git -C vibe-kanban pull
 docker compose up -d --build
 
 # Backup SQLite DB (bind mount — direct host access)
-cp data/vibe-kanban/db.v2.sqlite ./backup-$(date +%Y%m%d).sqlite
+cp data/home/.local/share/vibe-kanban/db.v2.sqlite ./backup-$(date +%Y%m%d).sqlite
 
-# Backup all data
-tar czf vk-backup-$(date +%Y%m%d).tar.gz data/
+# Backup all data (excluding caches)
+tar --exclude='data/home/.npm' --exclude='data/home/.vibe-kanban/bin' -czf vk-backup-$(date +%Y%m%d).tar.gz data/
 
 # Restore SQLite DB
 docker compose stop vibe-kanban
-cp ./backup.sqlite data/vibe-kanban/db.v2.sqlite
+cp ./backup.sqlite data/home/.local/share/vibe-kanban/db.v2.sqlite
 docker compose start vibe-kanban
 ```
 
@@ -356,7 +356,7 @@ Common issues: invalid/expired `CF_TUNNEL_TOKEN`, missing public hostname config
 **Permission denied errors** — The container uses root internally (sysbox isolates it). If bind mount permissions break:
 
 ```bash
-chown -R root:root data/ && docker compose restart
+chown -R root:root data/home/ && docker compose restart
 ```
 
 ## Reference
