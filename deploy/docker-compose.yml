@@ -10,7 +10,7 @@ services:
       - "${VK_SSH_PORT:-2222}:2222"
     volumes:
       - ./data/home:/home/vkuser                                 # Entire home directory (persists all dotfiles, caches, config)
-      - ./data/repos:/repos                                      # Cloned repositories
+      - ./data/repos:${REPOS_DIR:-/home/repos}                    # Cloned repositories
       - ./data/worktrees:/var/tmp/vibe-kanban                    # Worktrees
       - ./data/docker:/var/lib/docker                            # Docker-in-Docker storage
       - ./data/sshd:/etc/ssh/sshd_host_keys                     # sshd host keys (IDE SSH)
@@ -21,6 +21,7 @@ services:
       PORT: "3000"
       HOME: /home/vkuser
       VK_IDE_SSH: "${VK_IDE_SSH:-false}"
+      REPOS_DIR: "${REPOS_DIR:-/home/repos}"
     memswap_limit: "${VK_MEM_LIMIT:-8g}"
     deploy:
       resources:

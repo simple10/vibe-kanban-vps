@@ -305,6 +305,7 @@ If the script made no VPS host changes, write "None" under that heading. The dep
 | `SSH_USER` | No | SSH username (default: `root`) |
 | `SSH_PORT` | No | SSH port (default: `22`) |
 | `INSTALL_DIR` | No | Install directory on VPS (default: `/home/vibe-kanban`) |
+| `REPOS_DIR` | No | Directory inside the container where git repos are cloned (default: `/home/repos`) |
 | `VK_CPU_LIMIT` | No | Max CPU cores for vibe-kanban container (default: `4`) |
 | `VK_MEM_LIMIT` | No | Max memory for vibe-kanban container (default: `8g`) |
 | `VK_CPU_RESERVE` | No | Guaranteed CPU cores for vibe-kanban container (default: `1`) |
@@ -385,7 +386,7 @@ All persistent data is stored in bind mounts under `$INSTALL_DIR/data/` on the V
 | Container path | Host bind mount | Purpose |
 |---|---|---|
 | `/home/vkuser/` | `data/home/` | Entire home directory (all dotfiles, config, caches) |
-| `/repos/` | `data/repos/` | Cloned repositories |
+| `$REPOS_DIR` (default `/home/repos`) | `data/repos/` | Cloned repositories |
 | `/var/tmp/vibe-kanban/` | `data/worktrees/` | Git worktrees for agents |
 | `/var/lib/docker/` | `data/docker/` | Docker-in-Docker storage |
 | `/etc/ssh/sshd_host_keys/` | `data/sshd/` | sshd host keys (IDE SSH) |

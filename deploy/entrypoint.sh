@@ -24,7 +24,7 @@ mkdir -p /home/vkuser/.ssh
 mkdir -p /home/vkuser/.claude
 mkdir -p /home/vkuser/.config/gh
 mkdir -p /var/tmp/vibe-kanban/worktrees
-mkdir -p /repos
+mkdir -p "${REPOS_DIR:-/home/repos}"
 
 # Seed shell config from skeleton on first start (volume is empty)
 for f in .bashrc .profile .bash_logout; do
@@ -47,7 +47,26 @@ if [[ -L "$GITCONFIG_HOME" ]]; then
     fi
 fi
 
-chown -R vkuser:vkuser /repos /var/tmp/vibe-kanban /home/vkuser
+# Symlink repos dir into home so vibe-kanban's file browser finds repos at ~/repos
+# (only if REPOS_DIR is not already under /home/vkuser)
+_REPOS_DIR="${REPOS_DIR:-/home/repos}"
+case "$_REPOS_DIR" in
+    /home/vkuser/*)
+        ;; # already under home, no symlink needed
+    *)
+        if [[ ! -e /home/vkuser/repos ]]; then
+            ln -s "$_REPOS_DIR" /home/vkuser/repos
+        fi
+        ;;
+esac
+
+# Migrate legacy symlink pointing to old /repos path
+if [[ -L /home/vkuser/repos ]] && [[ "$(readlink /home/vkuser/repos)" == "/repos" ]]; then
+    rm /home/vkuser/repos
+    ln -s "$_REPOS_DIR" /home/vkuser/repos
+fi
+
+chown -R vkuser:vkuser "${REPOS_DIR:-/home/repos}" /var/tmp/vibe-kanban /home/vkuser
 
 # Ensure correct SSH permissions (volume may reset them)
 chmod 700 /home/vkuser/.ssh
@@ -66,7 +85,7 @@ if [[ "${VK_IDE_SSH:-false}" == "true" ]]; then
 
     # Write /etc/environment so SSH sessions inherit container env vars
     # (VS Code remote terminals need API keys, PATH, HOME, etc.)
-    env | grep -E '^(ANTHROPIC_API_KEY|GOOGLE_API_KEY|OPENAI_API_KEY|PATH|HOME|RUST_LOG|GIT_AUTHOR_NAME|GIT_AUTHOR_EMAIL|PORT|HOST)=' \
+    env | grep -E '^(ANTHROPIC_API_KEY|GOOGLE_API_KEY|OPENAI_API_KEY|PATH|HOME|RUST_LOG|GIT_AUTHOR_NAME|GIT_AUTHOR_EMAIL|PORT|HOST|REPOS_DIR)=' \
         > /etc/environment 2>/dev/null || true
 
     /usr/sbin/sshd -e
