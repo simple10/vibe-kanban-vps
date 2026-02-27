@@ -144,6 +144,13 @@ Use the helper scripts to authenticate Github and Claude Code.
 
 # SSH into the vibe-kanban container for debugging
 ./ssh-vibekanban.sh
+
+# Clone a repo into the repos dir in the vibe-kanban container.
+# Useful for seeding projects since Vibe Kanban expects to find
+# local repos to work with unless it's creating new ones.
+# Script will prompt for the repo URL or you can pass it as an arg.
+# Works with private repos if you're logged in to Github.
+./clone-repo-remote.sh
 ```
 
 NOTE: You will optionally need to sign-in to Vibe Kanban to enable the kanban features.
@@ -323,6 +330,7 @@ docker compose start vibe-kanban
 | `ssh-vps.sh` | SSH into the VPS host |
 | `ssh-vibekanban.sh` | SSH into the VPS and exec into the vibe-kanban container |
 | `ide-ssh-setup.sh` | Setup IDE SSH access (injects key, configures local SSH config) |
+| `clone-repo-remote.sh` | Clone a git repo into the vibe-kanban container |
 | `CLAUDE.md` | Instructions for Claude Code to deploy and operate the stack |
 
 ## Troubleshooting
